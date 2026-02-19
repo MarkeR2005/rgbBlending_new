@@ -408,7 +408,23 @@ std::shared_ptr<IBaseData> DataCalculator::mute(const std::shared_ptr<IBaseData>
 }
 
 std::shared_ptr<RgbData> DataCalculator::SwanToRGB(const std::shared_ptr<SeismicData>& input, int window){
-throw;
+        if (input->getType() != DataType::SWAN && input->getType() != DataType::EN_SWAN) {
+            return std::make_shared<RgbData>();
+        }
+        std::shared_ptr<SeismicData> inp = input;
+        if (input->getType() == DataType::SWAN) {
+            inp = toEnergy(input);
+        }
+        std::shared_ptr<SeismicData> smoothInput = std::dynamic_pointer_cast<SeismicData>(smoothT(inp, window));
+    	int samples = smoothInput->getSize().t;
+		std::vector<float> freqs = smoothInput->getFreq();
+        auto data = smoothInput->getRawDataRef();
+        std::vector<std::vector<std::vector<float>>> output(freqs.size());
+        for (int i = 0; i < freqs.size(); ++i) {
+            output[i] = {data[i]};
+        }
+        auto ret = std::make_shared<RgbData>(output, input->getDT(), freqs[0], freqs.back(), smoothInput->getName(), smoothInput->getProcedures()+"to_rgb");
+        return std::move(ret);
 }
 
 

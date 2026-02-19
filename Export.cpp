@@ -66,11 +66,18 @@ SeismicData* readDataIBMCube(std::wstring filePath, int type, int pos){
 		throw "RGBBlending: CUBE ERROR";
 	}
 }
+int getMaxTraceS(SeismicData* data){
+return data->getSize().x;
+}
+int getMaxTraceR(RgbData* data){
+return data->getSize().x;
+}
 
-TFormUniversal* CreateRgbBlendingFormSD(SeismicData* data, System::UnicodeString path){
+TFormUniversal* CreateRgbBlendingFormSD(SeismicData* data, System::UnicodeString path, std::function<void(int)> callback){
 	try {
 
 		TFormUniversal* form = new TFormUniversal(Application->MainForm, path);
+        form->setTraceCallback(callback);
         TAbstractDialog* dialog = new TAbstractDialog(nullptr);
 		dialog->AddInput<float>("Начальная частота", stnFreqStart);
 		dialog->AddInput<float>("Конечная частота", stnFreqStop);
@@ -92,9 +99,10 @@ TFormUniversal* CreateRgbBlendingFormSD(SeismicData* data, System::UnicodeString
 		throw "RGBBlending: UNKNOWN DATA ERROR";
 	}
 }
-TFormUniversal* CreateRgbBlendingFormRGB(RgbData* data, System::UnicodeString path){
+TFormUniversal* CreateRgbBlendingFormRGB(RgbData* data, System::UnicodeString path, std::function<void(int)> callback){
 	try {
 		TFormUniversal* form = new TFormUniversal(Application->MainForm, path);
+        form->setTraceCallback(callback);
 		form -> initFromData(std::make_shared<RgbData>(*data));
 		return form;
 	} catch (...) {

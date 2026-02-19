@@ -113,31 +113,44 @@ void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
 
 	}
 	else if (rData) {
-
 		std::unique_ptr<RgbWindow> window_ = std::make_unique<RgbWindow>();
 		if (rData->getSize().x == 1) {
 			window_->setThin();
 		}
+        ShowMessage("1");
 		window_->initWindow(viewPanel);
+        ShowMessage("2");
         std::vector<bitMap> tex = rData->getTexture();
+        ShowMessage("3");
 //        std::this_thread::sleep_for(std::chrono::seconds(1));
 		window_->initTexture(tex);
-		type = WindowType::RGB;
+        ShowMessage("4");
+        type = WindowType::RGB;
+        ShowMessage("5");
 		window = std::move(window_);
+                         ShowMessage("6");
 	}
 	else {
 		throw;
 	}
+    ShowMessage("7");
 	image1 ->Visible = true;
 	image1 ->Enabled = true;
 	image2 ->Visible = true;
 	image2 ->Enabled = true;
+    ShowMessage("8");
 	dataContainer = data;
+    ShowMessage("9");
 	setupCallbacks();
+    ShowMessage("1");
 	setupButtons();
+    ShowMessage("10");
 	window->resizeWindow(this->Width,this->Height);
+    ShowMessage("11");
 	updateAxis(true);
+    ShowMessage("12");
 	NameInfo->Caption = data->getName().c_str();
+    ShowMessage("13");
 }
 
 
@@ -276,7 +289,10 @@ void TWindowContainer::setupCallbacks()
 					TWindowContainer::emitToAll();
 					return;
 				}
-				updateAxis(false);});
+				updateAxis(false);
+                getPos();
+                callback(posx_);
+                });
 		break;
 		case WindowType::RGB:
 			winCall->setMouseButtonCallback(showPopupMenu);
@@ -291,7 +307,10 @@ void TWindowContainer::setupCallbacks()
 					emitToAll();
 					return;
 				}
-				updateAxis(false);});
+				updateAxis(false);
+                getPos();
+                callback(posx_);
+                });
 		break;
 		case WindowType::VOL:
 			winCall->setMouseButtonCallback(showPopupMenu);
@@ -304,6 +323,16 @@ void TWindowContainer::setupCallbacks()
 
 void TWindowContainer::createWindow(const std::shared_ptr<IBaseData>& newData){
 	TFormUniversal* form = new TFormUniversal (Application->MainForm, dynamic_cast<TFormUniversal*>(Parent)->getPath());
+    form->setTraceCallback(callback);
+	form -> Show();
+	form -> initFromData(std::move(newData));
+}
+void TWindowContainer::createWindow(const std::shared_ptr<IBaseData>& newData, int pos){
+	TFormUniversal* form = new TFormUniversal (Application->MainForm, dynamic_cast<TFormUniversal*>(Parent)->getPath());
+    auto clb = [&](int input){
+        callback(pos);
+    };
+    form->setTraceCallback(clb);
 	form -> Show();
 	form -> initFromData(std::move(newData));
 }
@@ -343,7 +372,7 @@ createWindow(newData);
 		{
 			getPos();
 			std::shared_ptr<IBaseData> newData = DataCalculator::getTrace(dataContainer, posx_);
-createWindow(newData);
+createWindow(newData, posx_);
 //                    ShowMessage("ok");
 		}
 	});
@@ -383,7 +412,7 @@ createWindow(newData);
 		dialog->AddInput<int>("Ўирина фильтра", stnFilterWindow);
 		if (dialog->Execute() && dialog->ContinuePressed) {
 			std::shared_ptr<IBaseData> newData = DataCalculator::getSwan(std::dynamic_pointer_cast<SeismicData>(dataContainer), posx_, stnFreqStart, stnFreqStop, stnNumFilters, stnFilterWindow);
-createWindow(newData);
+createWindow(newData, posx_);
 		}
 		delete dialog;
 		}
@@ -397,7 +426,7 @@ createWindow(newData);
 		dialog->AddInput<int>("Ўирина фильтра", stnFilterWindow);
 		if (dialog->Execute() && dialog->ContinuePressed) {
 			std::shared_ptr<IBaseData> newData = DataCalculator::getSwanRGB(std::dynamic_pointer_cast<SeismicData>(dataContainer), posx_, stnFreqStart, stnFreqStop, stnNumFilters, stnFilterWindow);
-createWindow(newData);
+createWindow(newData, posx_);
 		}
 		delete dialog;
 		}
@@ -426,7 +455,7 @@ createWindow(newData);
 		dialog->AddInput<int>("Ўирина окна сглаживани€", stnTWindow);
 		if (dialog->Execute() && dialog->ContinuePressed) {
 			std::shared_ptr<IBaseData> newData = DataCalculator::SwanToRGB(std::dynamic_pointer_cast<SeismicData>(dataContainer), stnTWindow);
-createWindow(newData);
+			createWindow(newData);
 		}
 		delete dialog;
 		}

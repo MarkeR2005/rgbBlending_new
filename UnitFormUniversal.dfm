@@ -72,10 +72,12 @@ object FormUniversal: TFormUniversal
         object LabelR: TLabel
           Left = 1
           Top = 1
-          Width = 7
-          Height = 15
+          Width = 133
+          Height = 16
           Align = alClient
           Caption = 'R'
+          ExplicitWidth = 7
+          ExplicitHeight = 15
         end
       end
       object ScrollBarR: TScrollBar
@@ -116,10 +118,12 @@ object FormUniversal: TFormUniversal
         object LabelB: TLabel
           Left = 1
           Top = 1
-          Width = 7
-          Height = 15
+          Width = 133
+          Height = 19
           Align = alClient
           Caption = 'B'
+          ExplicitWidth = 7
+          ExplicitHeight = 15
         end
       end
       object ScrollBarB: TScrollBar
@@ -160,10 +164,12 @@ object FormUniversal: TFormUniversal
         object LabelG: TLabel
           Left = 1
           Top = 1
-          Width = 8
-          Height = 15
+          Width = 133
+          Height = 17
           Align = alClient
           Caption = 'G'
+          ExplicitWidth = 8
+          ExplicitHeight = 15
         end
       end
       object ScrollBarG: TScrollBar

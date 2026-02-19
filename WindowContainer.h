@@ -44,6 +44,8 @@ private:
     void useFunction(TObject* Sender);
 
 	std::map<TObject*, std::function<void()>> func;
+
+    std::function<void(int)> callback = [](int p){};
 protected:
 	std::unique_ptr<IWindow> window;
 	std::shared_ptr<ColorManager> colorManager = std::make_shared<ColorManager>();
@@ -60,7 +62,9 @@ protected:
 //	void setupRgbButtons();
 	void setupVolumButtons();
 	void createWindow(const std::shared_ptr<IBaseData>& newData);
+    void createWindow(const std::shared_ptr<IBaseData>& newData, int pos);
 public:
+    void setTraceCallback(std::function<void(int)> callback_){callback= callback_;};
 	static std::vector<TWindowContainer*> instances_;
 	int getFreqSize();
     float getFreqByIndex(int idx);

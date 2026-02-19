@@ -80,6 +80,9 @@ public:		// User declarations
 		ScrollBarG->Max = std::max(fr_size-1, 0);
 		ScrollBarB->Max = std::max(fr_size-1, 0);
 	}
+    void setTraceCallback(std::function<void(int)> callback){
+        windowContainer->setTraceCallback(callback);
+    }
 };
 //---------------------------------------------------------------------------
 extern PACKAGE TFormUniversal *FormUniversal;
