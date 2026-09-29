@@ -80,7 +80,7 @@ protected:
 public:
     void setTraceCallback(std::function<void(int)> callback_){callback = callback_;};
     void setDisplayCallback(std::function<void(int, int)> callback_){callbackDisp = callback_;};
-    void setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb){horizonsCallback = std::move(cb);}
+    bool setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb);
     bool setHorizons(const std::vector<Horizon>& value);
     bool setCrosses(const std::vector<Cross>& value);
 	static std::vector<TWindowContainer*> instances_;

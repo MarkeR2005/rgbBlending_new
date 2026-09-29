@@ -160,6 +160,11 @@ void TWindowContainer::changeShader(GLuint shaderProgram){
         flatWin->setShaderProgram(shaderProgram);
     }
 }
+bool TWindowContainer::setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb) {
+    if (!dynamic_cast<FlatWindow*>(window.get())) return false;
+    horizonsCallback = std::move(cb);
+    return true;
+}
 bool TWindowContainer::setHorizons(const std::vector<Horizon>& value) {
     FlatWindow* flat = dynamic_cast<FlatWindow*>(window.get());
     if (!flat) return false;

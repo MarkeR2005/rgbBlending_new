@@ -12,7 +12,26 @@ The 2D RGB, highlight, horizon and cross-label shaders are embedded in the modul
 
 `Structures.h` defines `Horizon { std::wstring name; std::vector<float> points; }` and `Cross { std::wstring name; int x; }`. Each horizon ordinate corresponds to a trace index; negative or nonfinite ordinates leave a gap. Cross `x` is a trace index. Ordinate values use the same units as the existing horizon editor (sample position multiplied by the window's `dT`).
 
-The existing `CreateRgbBlendingForm(path, callback, callbackDisplay)` entry point remains available. For an initialized 2D form, the exported functions `setHorizons(form, horizons)` and `setCrosses(form, crosses)` replace the corresponding lists. `setTraceCallback(form, callback)`, `setDisplayCallback(form, callback)` and `setHorizonsCallback(form, callback)` register callbacks on a specific form and return `false` for a form of the wrong type. The **Обновить горизонты** button sends a snapshot of all named horizons through the registered horizons callback; edits do not invoke it automatically.
+The existing `CreateRgbBlendingForm(path, callback, callbackDisplay)` entry point remains available. `Export.h` has no dependency on `Structures.h` or the internal `Horizon`/`Cross` classes. The old data-object exports remain available to callers that explicitly include `LegacyDataExports.h`.
+
+For an initialized 2D form, the exported functions accept public pointer-and-count views. Inputs are copied before the setter returns; passing `nullptr, 0` clears a list:
+
+```cpp
+void __cdecl horizonsUpdated(const RgbHorizonView* items, int count, void* context) {
+    // Copy names and point arrays here if they are needed after this call.
+}
+
+void configureView(TForm* form, void* userContext) {
+    float picked[] = {120.0f, 121.0f, 123.0f};
+    RgbHorizonView horizons[] = {{L"Top", picked, 3}};
+    RgbCrossView crosses[] = {{L"Line 42", 42}};
+    setHorizons(form, horizons, 1);
+    setCrosses(form, crosses, 1);
+    setHorizonsCallback(form, horizonsUpdated, userContext);
+}
+```
+
+The **Обновить горизонты** button calls that callback with a temporary snapshot of all named horizons; edits do not invoke it automatically. `setTraceCallback` and `setDisplayCallback` remain available for the existing `std::function` based integration. A `false` setter result indicates an invalid form, unsupported view, or invalid array argument.
 
 The context menu's **Edit horizon (draw with mouse)** action opens a tree of named horizons with an entry for a new horizon. Selecting one starts the existing drag/interpolation interaction. Select the action again to leave editing mode. The new horizon name is entered in the field below the tree. Each horizon name appears just above its first valid (leftmost) point in the same negative drawing style as the lines. The legacy text, CSV and binary horizon import/export commands still read/write concatenated point arrays; imported horizons receive default names.
 

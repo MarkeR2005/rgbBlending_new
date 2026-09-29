@@ -4,7 +4,6 @@
 #define ExportH
 
 #include <functional>
-#include "Structures.h"
 #include <vcl.h>
 #ifdef MAKEDLL
 #  define EXPORT __declspec(dllexport)
@@ -13,33 +12,31 @@
 #endif
 //----------------------------------------------------------------
 
-extern class IBaseData;
-extern class SeismicData;
-extern class RgbData;
-
-//Reads data from IBM profile
-extern "C" SeismicData* EXPORT readDataIBM(std::wstring filePath);
-//Reads data from internal formats
-extern "C" RgbData* EXPORT readDataInternalFormat(std::wstring filePath, bool isRgb);
-//Reads data from IBM cube
-//Types 1 - inline | 2 - crossline | 3 - slice
-extern "C" SeismicData* EXPORT readDataIBMCube(std::wstring filePath, int type, int pos);
-
-
-
-extern "C" int EXPORT getMaxTraceS(SeismicData* data);
-extern "C" int EXPORT getMaxTraceR(RgbData* data);
-
 extern "C" void init();
 //extern "C" void EXPORT setMoveCallback(TFormUniversal* form, void (*callback)(int));
 extern "C" TForm* EXPORT CreateRgbBlendingForm(System::UnicodeString path, std::function<void(int)> callback, std::function<void(int, int)> callbackDisplay);
 extern "C" TForm* EXPORT CreateRgbBlendingFormCube(System::UnicodeString path);
+// Public transfer types. Pointers supplied to setters are copied before return.
+// Negative/nonfinite point values mark gaps; x is a trace index.
+struct RgbHorizonView {
+    const wchar_t* name;       // nullptr means an empty name
+    const float* points;       // nullptr is allowed only when pointCount == 0
+    int pointCount;
+};
+struct RgbCrossView {
+    const wchar_t* name;       // nullptr means an empty name
+    int x;
+};
+// The callback receives temporary views. Copy names and points if they are needed
+// after the callback returns. A null callback removes the registration.
+typedef void (__cdecl *RgbHorizonsCallback)(const RgbHorizonView* horizons, int count, void* context);
+
 // The form must be a live TFormUniversal returned by CreateRgbBlendingForm.
-// False indicates an invalid form or a window that is not a 2D view.
+// Setter inputs are validated; count == 0 clears a list and permits nullptr.
 extern "C" bool EXPORT setTraceCallback(TForm* f, std::function<void(int)> callback);
 extern "C" bool EXPORT setDisplayCallback(TForm* f, std::function<void(int, int)> callback);
-extern "C" bool EXPORT setHorizonsCallback(TForm* f, std::function<void(const std::vector<Horizon>&)> callback);
-extern "C" bool EXPORT setHorizons(TForm* f, const std::vector<Horizon>& horizons);
-extern "C" bool EXPORT setCrosses(TForm* f, const std::vector<Cross>& crosses);
+extern "C" bool EXPORT setHorizonsCallback(TForm* f, RgbHorizonsCallback callback, void* context);
+extern "C" bool EXPORT setHorizons(TForm* f, const RgbHorizonView* horizons, int count);
+extern "C" bool EXPORT setCrosses(TForm* f, const RgbCrossView* crosses, int count);
 //-----------
 #endif

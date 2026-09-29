@@ -3,6 +3,7 @@
 #pragma hdrstop
 
 #include "Export.h"
+#include "LegacyDataExports.h"
 #include "Reader.h"
 #include "SeismicData.h"
 #include "Dialog.h"
@@ -25,19 +26,51 @@ bool setDisplayCallback(TForm* f, std::function<void(int, int)> cb) {
     form->setDisplayCallback(std::move(cb));
     return true;
 }
-bool setHorizonsCallback(TForm* f, std::function<void(const std::vector<Horizon>&)> cb) {
+bool setHorizonsCallback(TForm* f, RgbHorizonsCallback callback, void* context) {
     auto* form = dynamic_cast<TFormUniversal*>(f);
     if (!form || !form->windowContainer) return false;
-    form->setHorizonsCallback(std::move(cb));
-    return true;
+    if (!callback) {
+        return form->setHorizonsCallback({});
+    }
+    return form->setHorizonsCallback([callback, context](const std::vector<Horizon>& list) {
+        std::vector<RgbHorizonView> views;
+        views.reserve(list.size());
+        for (const auto& horizon : list) {
+            views.push_back({horizon.name.c_str(),
+                             horizon.points.empty() ? nullptr : horizon.points.data(),
+                             static_cast<int>(horizon.points.size())});
+        }
+        callback(views.empty() ? nullptr : views.data(), static_cast<int>(views.size()), context);
+    });
 }
-bool setHorizons(TForm* f, const std::vector<Horizon>& horizons) {
+bool setHorizons(TForm* f, const RgbHorizonView* input, int count) {
     auto* form = dynamic_cast<TFormUniversal*>(f);
-    return form && form->windowContainer && form->setHorizons(horizons);
+    if (!form || !form->windowContainer || count < 0 || (count && !input)) return false;
+    std::vector<Horizon> converted;
+    converted.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        const auto& item = input[i];
+        if (item.pointCount < 0 || (item.pointCount && !item.points)) return false;
+        Horizon horizon;
+        if (item.name) horizon.name = item.name;
+        if (item.pointCount)
+            horizon.points.assign(item.points, item.points + item.pointCount);
+        converted.push_back(std::move(horizon));
+    }
+    return form->setHorizons(converted);
 }
-bool setCrosses(TForm* f, const std::vector<Cross>& crosses) {
+bool setCrosses(TForm* f, const RgbCrossView* input, int count) {
     auto* form = dynamic_cast<TFormUniversal*>(f);
-    return form && form->windowContainer && form->setCrosses(crosses);
+    if (!form || !form->windowContainer || count < 0 || (count && !input)) return false;
+    std::vector<Cross> converted;
+    converted.reserve(count);
+    for (int i = 0; i < count; ++i) {
+        Cross cross;
+        if (input[i].name) cross.name = input[i].name;
+        cross.x = input[i].x;
+        converted.push_back(std::move(cross));
+    }
+    return form->setCrosses(converted);
 }
 void init(){
 ShowMessage("Init");
