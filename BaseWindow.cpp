@@ -72,9 +72,9 @@ void FlatWindow::initWindow(TPanel* parent)
 	glEnableVertexAttribArray(1);
 
 
-	highlightProgram = createShaderProgram("universal", "highlight");
-	horizonProgram = createShaderProgram("test", "horizon");
-    labelProgram = createShaderProgram("cross_label", "cross_label");
+	highlightProgram = create2DHighlightShaderProgram();
+	horizonProgram = create2DHorizonShaderProgram();
+    labelProgram = createCrossLabelShaderProgram();
 
 	//For horizons
 	glGenVertexArrays(1, &VAO1);

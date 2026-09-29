@@ -18,7 +18,7 @@ RgbWindow::~RgbWindow() {
 }
 void RgbWindow::initWindow(TPanel* parent) {
     FlatWindow::initWindow(parent);
-    setShaderProgram(createShaderProgram("universal", "rgb_composite"));
+    setShaderProgram(create2DRgbShaderProgram());
 }
 void RgbWindow::initData(std::shared_ptr<RgbData> data) {
     source = std::move(data);

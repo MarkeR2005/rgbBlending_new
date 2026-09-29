@@ -6,7 +6,7 @@ Windows VCL/OpenGL module for seismic and RGB views. The existing cube/3D render
 
 The 2D RGB window keeps the source `RgbData` in RAM. It converts only the three selected frequency filters through `ColorManager`, combines them into one RGB buffer and uploads a single `GL_RGB8` texture. Changing channel indices rebuilds that texture; changing visibility, contrast, zoom or pan uses the existing texture. Repeated indices are converted once. The full frequency stack is no longer allocated as a 2D GPU texture array. The OpenGL maximum single texture dimension still applies.
 
-Keep the `shaders` directory alongside the application executable; it now also needs `rgb_composite.frag`, `cross_label.vert` and `cross_label.frag`.
+The 2D RGB, highlight, horizon and cross-label shaders are embedded in the module, so opening a 2D RGB window does not depend on deploying shader files. The original `shaders` directory is still needed for other render paths. Missing file-based shaders now report their filename rather than an opaque GLSL error.
 
 ## Horizons and crosses
 
