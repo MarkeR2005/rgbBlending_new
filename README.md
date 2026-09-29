@@ -12,26 +12,54 @@ The 2D RGB, highlight, horizon and cross-label shaders are embedded in the modul
 
 `Structures.h` defines `Horizon { std::wstring name; std::vector<float> points; }` and `Cross { std::wstring name; int x; }`. Each horizon ordinate corresponds to a trace index; negative or nonfinite ordinates leave a gap. Cross `x` is a trace index. Ordinate values use the same units as the existing horizon editor (sample position multiplied by the window's `dT`).
 
-The existing `CreateRgbBlendingForm(path, callback, callbackDisplay)` entry point remains available. `Export.h` has no dependency on `Structures.h` or the internal `Horizon`/`Cross` classes. The old data-object exports remain available to callers that explicitly include `LegacyDataExports.h`.
+The existing `CreateRgbBlendingForm(path, callback, callbackDisplay)` entry point remains available. `Export.h` does not include `Structures.h` or expose the internal `Horizon`/`Cross` classes. `RgbHorizons` and `RgbCrosses` are public aliases for vectors of `(name, values)` pairs. The old data-object exports remain available to callers that explicitly include `LegacyDataExports.h`.
 
-For an initialized 2D form, the exported functions accept public pointer-and-count views. Inputs are copied before the setter returns; passing `nullptr, 0` clears a list:
+For a client that loads the DLL with `GetProcAddress`, include only `Export.h` and use its function pointer typedefs. For example:
 
 ```cpp
-void __cdecl horizonsUpdated(const RgbHorizonView* items, int count, void* context) {
-    // Copy names and point arrays here if they are needed after this call.
+#include <Windows.h>
+#include "Export.h"
+
+void __cdecl horizonsUpdated(const RgbHorizons& items, void* context) {
+    // Copy items if they are needed after this callback returns.
 }
 
-void configureView(TForm* form, void* userContext) {
-    float picked[] = {120.0f, 121.0f, 123.0f};
-    RgbHorizonView horizons[] = {{L"Top", picked, 3}};
-    RgbCrossView crosses[] = {{L"Line 42", 42}};
-    setHorizons(form, horizons, 1);
-    setCrosses(form, crosses, 1);
-    setHorizonsCallback(form, horizonsUpdated, userContext);
+void openView(const wchar_t* dllPath, const wchar_t* dataPath, void* userContext) {
+    HMODULE dll = LoadLibraryW(dllPath);
+    if (!dll) return;
+
+    auto create = reinterpret_cast<CreateRgbBlendingFormFn>(
+        GetProcAddress(dll, "CreateRgbBlendingForm"));
+    auto putHorizons = reinterpret_cast<SetHorizonsFn>(
+        GetProcAddress(dll, "setHorizons"));
+    auto putCrosses = reinterpret_cast<SetCrossesFn>(
+        GetProcAddress(dll, "setCrosses"));
+    auto onHorizons = reinterpret_cast<SetHorizonsCallbackFn>(
+        GetProcAddress(dll, "setHorizonsCallback"));
+    if (!create || !putHorizons || !putCrosses || !onHorizons) {
+        FreeLibrary(dll);
+        return;
+    }
+
+    TForm* form = create(System::UnicodeString(dataPath),
+        [](int trace) { /* map callback */ },
+        [](int trace, int sample) { /* display callback */ });
+    if (!form) {
+        FreeLibrary(dll);
+        return;
+    }
+
+    RgbHorizons horizons = {{L"Top", {120.0f, 121.0f, 123.0f}}};
+    RgbCrosses crosses = {{L"Line 42", 42}};
+    putHorizons(form, horizons);
+    putCrosses(form, crosses);
+    onHorizons(form, horizonsUpdated, userContext);
+    form->Show();
+    // Keep dll loaded while form and callbacks are in use.
 }
 ```
 
-The **Обновить горизонты** button calls that callback with a temporary snapshot of all named horizons; edits do not invoke it automatically. `setTraceCallback` and `setDisplayCallback` remain available for the existing `std::function` based integration. A `false` setter result indicates an invalid form, unsupported view, or invalid array argument.
+An empty vector clears the corresponding list. The **Обновить горизонты** button calls `horizonsUpdated` with a snapshot of all named horizons; edits do not invoke it automatically. `setTraceCallback` and `setDisplayCallback` can be loaded the same way if callbacks need to change after creation. A `false` setter result indicates an invalid form or unsupported view. Since this interface passes VCL and STL types across the DLL boundary, the host and DLL must use compatible C++Builder toolchains and runtimes; keep the DLL loaded for the lifetime of the window.
 
 The context menu's **Edit horizon (draw with mouse)** action opens a tree of named horizons with an entry for a new horizon. Selecting one starts the existing drag/interpolation interaction. Select the action again to leave editing mode. The new horizon name is entered in the field below the tree. Each horizon name appears just above its first valid (leftmost) point in the same negative drawing style as the lines. The legacy text, CSV and binary horizon import/export commands still read/write concatenated point arrays; imported horizons receive default names.
 

@@ -14,60 +14,55 @@
 #include "ChooseForm.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
-bool setTraceCallback(TForm* f, std::function<void(int)> cb) {
+bool __cdecl setTraceCallback(TForm* f, std::function<void(int)> cb) {
     auto* form = dynamic_cast<TFormUniversal*>(f);
     if (!form || !form->windowContainer) return false;
     form->setTraceCallback(std::move(cb));
     return true;
 }
-bool setDisplayCallback(TForm* f, std::function<void(int, int)> cb) {
+bool __cdecl setDisplayCallback(TForm* f, std::function<void(int, int)> cb) {
     auto* form = dynamic_cast<TFormUniversal*>(f);
     if (!form || !form->windowContainer) return false;
     form->setDisplayCallback(std::move(cb));
     return true;
 }
-bool setHorizonsCallback(TForm* f, RgbHorizonsCallback callback, void* context) {
+bool __cdecl setHorizonsCallback(TForm* f, RgbHorizonsCallback callback, void* context) {
     auto* form = dynamic_cast<TFormUniversal*>(f);
     if (!form || !form->windowContainer) return false;
     if (!callback) {
         return form->setHorizonsCallback({});
     }
     return form->setHorizonsCallback([callback, context](const std::vector<Horizon>& list) {
-        std::vector<RgbHorizonView> views;
-        views.reserve(list.size());
+        RgbHorizons snapshot;
+        snapshot.reserve(list.size());
         for (const auto& horizon : list) {
-            views.push_back({horizon.name.c_str(),
-                             horizon.points.empty() ? nullptr : horizon.points.data(),
-                             static_cast<int>(horizon.points.size())});
+            snapshot.emplace_back(horizon.name, horizon.points);
         }
-        callback(views.empty() ? nullptr : views.data(), static_cast<int>(views.size()), context);
+        callback(snapshot, context);
     });
 }
-bool setHorizons(TForm* f, const RgbHorizonView* input, int count) {
+bool __cdecl setHorizons(TForm* f, const RgbHorizons& input) {
     auto* form = dynamic_cast<TFormUniversal*>(f);
-    if (!form || !form->windowContainer || count < 0 || (count && !input)) return false;
+    if (!form || !form->windowContainer) return false;
     std::vector<Horizon> converted;
-    converted.reserve(count);
-    for (int i = 0; i < count; ++i) {
-        const auto& item = input[i];
-        if (item.pointCount < 0 || (item.pointCount && !item.points)) return false;
+    converted.reserve(input.size());
+    for (const auto& item : input) {
         Horizon horizon;
-        if (item.name) horizon.name = item.name;
-        if (item.pointCount)
-            horizon.points.assign(item.points, item.points + item.pointCount);
+        horizon.name = item.first;
+        horizon.points = item.second;
         converted.push_back(std::move(horizon));
     }
     return form->setHorizons(converted);
 }
-bool setCrosses(TForm* f, const RgbCrossView* input, int count) {
+bool __cdecl setCrosses(TForm* f, const RgbCrosses& input) {
     auto* form = dynamic_cast<TFormUniversal*>(f);
-    if (!form || !form->windowContainer || count < 0 || (count && !input)) return false;
+    if (!form || !form->windowContainer) return false;
     std::vector<Cross> converted;
-    converted.reserve(count);
-    for (int i = 0; i < count; ++i) {
+    converted.reserve(input.size());
+    for (const auto& item : input) {
         Cross cross;
-        if (input[i].name) cross.name = input[i].name;
-        cross.x = input[i].x;
+        cross.name = item.first;
+        cross.x = item.second;
         converted.push_back(std::move(cross));
     }
     return form->setCrosses(converted);
@@ -116,7 +111,7 @@ int getMaxTraceS(SeismicData* data){
 return data->getSize().x;
 }
 
-TForm* CreateRgbBlendingForm(System::UnicodeString path, std::function<void(int)> callback, std::function<void(int, int)> callbackDisplay){
+TForm* __cdecl CreateRgbBlendingForm(System::UnicodeString path, std::function<void(int)> callback, std::function<void(int, int)> callbackDisplay){
 	try {
 		TChoose* choose = new TChoose(Application->MainForm);
 		choose->SetRGBPath(path);
@@ -170,7 +165,7 @@ TForm* CreateRgbBlendingForm(System::UnicodeString path, std::function<void(int)
 	}
 }
 
-TForm* CreateRgbBlendingFormCube(System::UnicodeString path){
+TForm* __cdecl CreateRgbBlendingFormCube(System::UnicodeString path){
 	try {
 		TChoose* choose = new TChoose(Application->MainForm);
 		choose->SetRGBPath(path);
