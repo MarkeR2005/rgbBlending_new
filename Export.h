@@ -29,11 +29,9 @@ extern "C" SeismicData* EXPORT readDataIBMCube(std::wstring filePath, int type, 
 extern "C" int EXPORT getMaxTraceS(SeismicData* data);
 extern "C" int EXPORT getMaxTraceR(RgbData* data);
 
-
-extern class TFormUniversal;
+extern "C" void init();
 //extern "C" void EXPORT setMoveCallback(TFormUniversal* form, void (*callback)(int));
-extern "C" TFormUniversal* EXPORT CreateRgbBlendingFormSD(SeismicData* data, System::UnicodeString path, std::function<void(int)> callback);
-extern "C" TFormUniversal* EXPORT CreateRgbBlendingFormRGB(RgbData* data, System::UnicodeString path, std::function<void(int)> callback);
-extern "C" void EXPORT ShowForm(TFormUniversal* form);
+extern "C" TForm* EXPORT CreateRgbBlendingForm(System::UnicodeString path, std::function<void(int)> callback, std::function<void(int, int)> callbackDisplay);
+extern "C" TForm* EXPORT CreateRgbBlendingFormCube(System::UnicodeString path);
 //-----------
 #endif

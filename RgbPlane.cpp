@@ -12,12 +12,12 @@
 #include <iostream>
 
 RgbPlane::RgbPlane(const glm::vec3& anchor, const glm::vec3& normal,
-				 const glm::vec2& size, GLuint shaderProgram, bool flipV, bool flipH)
+				 const glm::vec2& size, GLuint shaderProgram, std::function<std::shared_ptr<RgbData>()> ret, bool flipV, bool flipH)
 	: AbstractPlane(anchor, normal, size, shaderProgram, flipV, flipH),
       m_textureArray(0),
       m_redChannel(0), m_greenChannel(1), m_blueChannel(2),
       m_redEnabled(true), m_greenEnabled(true), m_blueEnabled(true),
-      m_inverse(false), m_contrast(1.0f), m_layerCount(0) {
+      m_inverse(false), m_contrast(1.0f), m_layerCount(0), ret_func(ret) {
     setupShader();
 }
 
@@ -91,7 +91,7 @@ void RgbPlane::render(const glm::mat4& view, const glm::mat4& projection) {
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 	glBindVertexArray(0);
 
-	glDisable(GL_BLEND);
+	//glDisable(GL_BLEND);
 }
 
 void RgbPlane::initTextureArray(const std::vector<bitMap>& textureData) {

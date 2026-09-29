@@ -6,7 +6,7 @@ object AbstractDialog: TAbstractDialog
   Caption = #1055#1072#1088#1072#1084#1077#1090#1088#1099
   ClientHeight = 400
   ClientWidth = 450
-  Color = clBtnFace
+  Color = clInfoBk
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -11
@@ -23,8 +23,6 @@ object AbstractDialog: TAbstractDialog
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 0
-    ExplicitTop = 358
-    ExplicitWidth = 446
     object ContinueButton: TButton
       Left = 230
       Top = 8
@@ -54,7 +52,5 @@ object AbstractDialog: TAbstractDialog
     Align = alClient
     BorderStyle = bsNone
     TabOrder = 1
-    ExplicitWidth = 446
-    ExplicitHeight = 358
   end
 end

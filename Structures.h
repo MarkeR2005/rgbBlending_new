@@ -53,7 +53,7 @@ struct Traces
     int dt;
     float* data;
 	void init (int trNum, int spNum, int dT, float* dat);
-    ~Traces(){delete[] data;};
+    ~Traces(){if (data != nullptr) delete[] data;};
 };
 //--
 struct byteMap

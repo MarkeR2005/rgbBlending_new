@@ -12,7 +12,6 @@ RgbData::RgbData(const std::vector<std::vector<std::vector<float>>>& data_, cons
 const float freqStart, const float freqFinish, const std::string name_, const std::string procedures_):
 data(data_), dT(dT_), name(name_), procedures(procedures_)
 {
-
 	filters = data.size();
 	traces = data[0].size();
 	samples = data[0][0].size();

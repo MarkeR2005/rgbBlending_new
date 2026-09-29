@@ -9,9 +9,9 @@
 #include <iostream>
 
 SeismicPlane::SeismicPlane(const glm::vec3& anchor, const glm::vec3& normal,
-						 const glm::vec2& size, GLuint shaderProgram, bool flipV, bool flipH)
+						 const glm::vec2& size, GLuint shaderProgram, std::function<std::shared_ptr<SeismicData>()> ret, bool flipV, bool flipH)
 	: AbstractPlane(anchor, normal, size, shaderProgram, flipV, flipH),
-	  m_paletteTexture(0), m_contrast(1.0f) {
+	  m_paletteTexture(0), m_contrast(1.0f), ret_func(ret) {
     setupShader();
 }
 

@@ -35,8 +35,28 @@ void RgbWindow::initWindow(TPanel* parent)
 void RgbWindow::initTexture(const std::vector<bitMap>& textures)
 {
 	//Проверка инициализации
-	if (!handle) throw Exception("Uninitialized window");
+	if (!handle) {
+    OutputDebugStringA("CTX");
+    throw Exception("Uninitialized window");
+    }
 	glfwMakeContextCurrent(handle);
+    if (glfwGetCurrentContext() != handle) {
+    const char* description = nullptr;
+    int errorCode = glfwGetError(&description);
+    OutputDebugStringA(description);
+    throw Exception(description);
+}
+GLenum glew_err = glewInit();
+    if (glew_err != GLEW_OK) {
+     OutputDebugStringA("GLEW");
+        throw Exception(reinterpret_cast<const char*>(glewGetErrorString(glew_err)));
+    }
+    if (!GLEW_VERSION_3_0) {
+    OutputDebugStringA("GLEW_VER");
+        throw Exception("OpenGL 3.0 not supported");
+    }
+const GLubyte* version = glGetString(GL_VERSION);
+if (!version) throw Exception("OpenGL context not available");
 	//Выставляем параметры
 	width = textures[0].width;
 	height = textures[0].height;
@@ -47,6 +67,7 @@ void RgbWindow::initTexture(const std::vector<bitMap>& textures)
 	glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_R8, width, height, size, 0,
 				 GL_RED, GL_UNSIGNED_BYTE, nullptr);
 	//Заполняем текстуру
+    //ShowMessage("Filling");
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);  // Критически важно для 1-байтовых данных!
 	for (int i = 0; i < size; ++i)
 	{
@@ -68,6 +89,7 @@ void RgbWindow::initTexture(const std::vector<bitMap>& textures)
     GLenum err = glGetError();
 	if (err != GL_NO_ERROR)
 	{
+        OutputDebugStringA("GL_Error");
 		throw Exception(err);
 	}
 }
@@ -97,6 +119,7 @@ void RgbWindow::renderWindow()
 	glUniform1i(glGetUniformLocation(shaderProgram, "count"), size);
 	//Очистка буфферов
 	FlatWindow::postRender();
+    glfwSwapBuffers(handle);
 }
 //--
 void RgbWindow::setColor(int _R, int _G, int _B)
@@ -113,3 +136,30 @@ void RgbWindow::setView(bool _isR, bool _isG, bool _isB)
 	isB=_isB;
 }
 
+void RgbWindow::renderForScreenshot()
+{
+	//Проверка инициализции
+	if (!handle) return;
+	//Очистка
+	FlatWindow::preRender();
+	//Родительский рендер
+	FlatWindow::render();
+	//Собственный рендер
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, indexTexture);
+	glUniform1i(glGetUniformLocation(shaderProgram, "textureArray"), 0);
+//	glActiveTexture(GL_TEXTURE1);
+//	glBindTexture(GL_TEXTURE_2D, alphaTexture);
+	//glUniform1i(glGetUniformLocation(shaderProgram, "alphaTexture"), 1);
+	glUniform1i(glGetUniformLocation(shaderProgram, "R"), R);
+	glUniform1i(glGetUniformLocation(shaderProgram, "isR"), isR);
+	glUniform1i(glGetUniformLocation(shaderProgram, "G"), G);
+	glUniform1i(glGetUniformLocation(shaderProgram, "isG"), isG);
+	glUniform1i(glGetUniformLocation(shaderProgram, "B"), B);
+	glUniform1i(glGetUniformLocation(shaderProgram, "isB"), isB);
+	glUniform1i(glGetUniformLocation(shaderProgram, "inverse"), inverse);
+	glUniform1i(glGetUniformLocation(shaderProgram, "count"), size);
+	//Очистка буфферов
+	FlatWindow::postRender();
+    glFlush();
+}

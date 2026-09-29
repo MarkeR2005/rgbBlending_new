@@ -25,6 +25,7 @@ class SeismicWindow : public FlatWindow
 	//--
 	void renderWindow() override;
 	//--
+    void renderForScreenshot() override;
 
 	protected:
 	//--

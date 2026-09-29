@@ -6,7 +6,7 @@
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
         <Platform Condition="'$(Platform)'==''">Win64</Platform>
-        <ProjectName Condition="'$(ProjectName)'==''">Project2</ProjectName>
+        <ProjectName Condition="'$(ProjectName)'==''">RgbBlending</ProjectName>
         <TargetedPlatforms>2</TargetedPlatforms>
         <AppType>Library</AppType>
     </PropertyGroup>
@@ -68,13 +68,13 @@
         <ILINK_TranslatedLibraryPath>$(BDSLIB)\$(PLATFORM)\release\$(LANGDIR);$(ILINK_TranslatedLibraryPath)</ILINK_TranslatedLibraryPath>
         <ProjectType>VCppStyleDll</ProjectType>
         <DCC_Namespace>System;Xml;Data;Datasnap;Web;Soap;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;$(DCC_Namespace)</DCC_Namespace>
-        <AllPackageLibs>rtl.lib;vcl.lib</AllPackageLibs>
+        <AllPackageLibs>rtl.lib;vcl.lib;VirtualTreesR.lib;vclx.lib</AllPackageLibs>
         <Multithreaded>true</Multithreaded>
         <ILINK_GenerateImportLibrary>true</ILINK_GenerateImportLibrary>
         <_TCHARMapping>wchar_t</_TCHARMapping>
         <IncludePath>import\;..\..\..\..\Desktop\dllMigration\libVersion\;$(IncludePath)</IncludePath>
         <ILINK_LibraryPath>import\;..\..\..\..\Desktop\dllMigration\libVersion\;$(ILINK_LibraryPath)</ILINK_LibraryPath>
-        <SanitizedProjectName>Project2</SanitizedProjectName>
+        <SanitizedProjectName>RgbBlending</SanitizedProjectName>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <PackageImports>adortl;appanalytics;bcbie;bcbsmp;bindcomp;bindcompdbx;bindcompfmx;bindcompvcl;bindcompvclsmp;bindcompvclwinx;bindengine;CloudService;CustomIPTransport;DataSnapClient;DataSnapCommon;DataSnapConnectors;DatasnapConnectorsFreePascal;DataSnapFireDAC;DataSnapIndy10ServerTransport;DataSnapNativeClient;DataSnapProviderClient;DataSnapServer;DataSnapServerMidas;dbexpress;dbrtl;dbxcds;DbxClientDriver;DbxCommonDriver;DBXDb2Driver;DBXFirebirdDriver;DBXInformixDriver;DBXInterBaseDriver;DBXMSSQLDriver;DBXMySQLDriver;DBXOdbcDriver;DBXOracleDriver;DBXSqliteDriver;DBXSybaseASADriver;DBXSybaseASEDriver;dsnap;dsnapcon;dsnapxml;emsclient;emsclientfiredac;emsedge;emshosting;emsserverresource;FireDAC;FireDACADSDriver;FireDACASADriver;FireDACCommon;FireDACCommonDriver;FireDACCommonODBC;FireDACDb2Driver;FireDACDBXDriver;FireDACDSDriver;FireDACIBDriver;FireDACInfxDriver;FireDACMongoDBDriver;FireDACMSAccDriver;FireDACMSSQLDriver;FireDACMySQLDriver;FireDACODBCDriver;FireDACOracleDriver;FireDACPgDriver;FireDACSqliteDriver;FireDACTDataDriver;fmx;fmxase;fmxdae;fmxFireDAC;fmxobj;IndyCore;IndyIPClient;IndyIPCommon;IndyIPServer;IndyProtocols;IndySystem;inet;inetdb;inetdbxpress;RESTBackendComponents;RESTComponents;rtl;SFP_cmp;Skia;soapmidas;soaprtl;soapserver;tethering;vcl;vclactnband;vcldb;vcldsnap;vcledge;vclFireDAC;vclie;vclimg;VCLRESTComponents;VclSmp;vcltouch;vclwinx;vclx;VirtualTreesR;xmlrtl;$(PackageImports)</PackageImports>
@@ -84,12 +84,12 @@
         <VerInfo_Keys>CompanyName=;FileDescription=$(MSBuildProjectName);FileVersion=1.0.0.0;InternalName=;LegalCopyright=;LegalTrademarks=;OriginalFilename=;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=$(MSBuildProjectName);ProductVersion=1.0.0.0;Comments=</VerInfo_Keys>
         <VerInfo_Locale>1033</VerInfo_Locale>
         <IncludePath>$(BDSINCLUDE)\windows\vcl;$(IncludePath)</IncludePath>
-        <BCC_PCHName_Clang>Project2PCH1.h</BCC_PCHName_Clang>
+        <BCC_PCHName_Clang>RgbBlendingPCH1.h</BCC_PCHName_Clang>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
         <PackageImports>adortl;appanalytics;bcbie;bcbsmp;bindcomp;bindcompdbx;bindcompfmx;bindcompvcl;bindcompvclsmp;bindcompvclwinx;bindengine;CloudService;CustomIPTransport;DataSnapClient;DataSnapCommon;DataSnapConnectors;DatasnapConnectorsFreePascal;DataSnapFireDAC;DataSnapIndy10ServerTransport;DataSnapNativeClient;DataSnapProviderClient;DataSnapServer;DataSnapServerMidas;dbexpress;dbrtl;dbxcds;DbxClientDriver;DbxCommonDriver;DBXDb2Driver;DBXFirebirdDriver;DBXInformixDriver;DBXInterBaseDriver;DBXMSSQLDriver;DBXMySQLDriver;DBXOdbcDriver;DBXOracleDriver;DBXSqliteDriver;DBXSybaseASADriver;DBXSybaseASEDriver;dsnap;dsnapcon;dsnapxml;emsclient;emsclientfiredac;emsedge;emshosting;emsserverresource;FireDAC;FireDACADSDriver;FireDACASADriver;FireDACCommon;FireDACCommonDriver;FireDACCommonODBC;FireDACDb2Driver;FireDACDBXDriver;FireDACDSDriver;FireDACIBDriver;FireDACInfxDriver;FireDACMongoDBDriver;FireDACMSAccDriver;FireDACMSSQLDriver;FireDACMySQLDriver;FireDACODBCDriver;FireDACOracleDriver;FireDACPgDriver;FireDACSqliteDriver;FireDACTDataDriver;fmx;fmxase;fmxdae;fmxFireDAC;fmxobj;IndyCore;IndyIPClient;IndyIPCommon;IndyIPServer;IndyProtocols;IndySystem;inet;inetdb;inetdbxpress;RESTBackendComponents;RESTComponents;rtl;SFP_cmp;Skia;soapmidas;soaprtl;soapserver;tethering;vcl;vclactnband;vcldb;vcldsnap;vcledge;vclFireDAC;vclie;vclimg;VCLRESTComponents;VclSmp;vcltouch;vclwinx;vclx;VirtualTreesR;xmlrtl;$(PackageImports)</PackageImports>
         <IncludePath>$(BDSINCLUDE)\windows\vcl;$(IncludePath)</IncludePath>
-        <BCC_PCHName_Clang>Project2PCH1.h</BCC_PCHName_Clang>
+        <BCC_PCHName_Clang>RgbBlendingPCH1.h</BCC_PCHName_Clang>
         <DCC_Namespace>Winapi;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;$(DCC_Namespace)</DCC_Namespace>
         <BT_BuildType>Debug</BT_BuildType>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
@@ -98,7 +98,7 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64x)'!=''">
         <PackageImports>adortl;bindcomp;bindcompdbx;bindcompfmx;bindcompvcl;bindcompvclsmp;bindcompvclwinx;bindengine;CustomIPTransport;dbexpress;dbrtl;dbxcds;DbxClientDriver;DbxCommonDriver;DBXDb2Driver;DBXFirebirdDriver;DBXInformixDriver;DBXInterBaseDriver;DBXMSSQLDriver;DBXMySQLDriver;DBXOdbcDriver;DBXOracleDriver;DBXSqliteDriver;DBXSybaseASADriver;DBXSybaseASEDriver;dsnap;dsnapcon;dsnapxml;FireDAC;FireDACADSDriver;FireDACASADriver;FireDACCommon;FireDACCommonDriver;FireDACCommonODBC;FireDACDb2Driver;FireDACDBXDriver;FireDACIBDriver;FireDACInfxDriver;FireDACMongoDBDriver;FireDACMSAccDriver;FireDACMSSQLDriver;FireDACMySQLDriver;FireDACODBCDriver;FireDACOracleDriver;FireDACPgDriver;FireDACSqliteDriver;FireDACTDataDriver;fmx;fmxase;fmxdae;fmxFireDAC;fmxobj;IndyCore;IndyIPClient;IndyIPCommon;IndyIPServer;IndyProtocols;IndySystem;inet;RESTBackendComponents;RESTComponents;rtl;Skia;vcl;vclactnband;vcldb;vcldsnap;vcledge;vclFireDAC;vclie;vclimg;VCLRESTComponents;VclSmp;vcltouch;vclwinx;vclx;xmlrtl;$(PackageImports)</PackageImports>
-        <BCC_PCHName_Clang>Project2PCH1.h</BCC_PCHName_Clang>
+        <BCC_PCHName_Clang>RgbBlendingPCH1.h</BCC_PCHName_Clang>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1)'!=''">
         <BCC_OptimizeForSpeed>false</BCC_OptimizeForSpeed>
@@ -133,7 +133,7 @@
         <AppDPIAwarenessMode>none</AppDPIAwarenessMode>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
-        <LinkPackageImports>rtl.bpi;vcl.bpi</LinkPackageImports>
+        <LinkPackageImports>rtl.bpi;vcl.bpi;VirtualTreesR.bpi;vclx.bpi</LinkPackageImports>
         <IncludePath>C:\Users\belousov\Desktop\dllMigration\libVersion\__libs\include;$(IncludePath)</IncludePath>
         <ILINK_LibraryPath>C:\Users\belousov\Desktop\dllMigration\libVersion\__libs\bin;$(ILINK_LibraryPath)</ILINK_LibraryPath>
         <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
@@ -159,6 +159,12 @@
             <VirtualFolder>{46C88EBE-1344-4FFB-A12B-D8193BB1E075}</VirtualFolder>
             <DependentOn>BaseWindow.h</DependentOn>
             <BuildOrder>2</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="ChooseForm.cpp">
+            <Form>Choose</Form>
+            <FormType>dfm</FormType>
+            <DependentOn>ChooseForm.h</DependentOn>
+            <BuildOrder>29</BuildOrder>
         </CppCompile>
         <CppCompile Include="ColorManager.cpp">
             <VirtualFolder>{8B80B3DC-9137-48C4-B3EF-4806D7D82BCA}</VirtualFolder>
@@ -202,15 +208,15 @@
             <DependentOn>InterfacesWindow.h</DependentOn>
             <BuildOrder>12</BuildOrder>
         </CppCompile>
-        <PCHCompile Include="Project2PCH1.h">
-            <BuildOrder>0</BuildOrder>
-            <PCH>true</PCH>
-        </PCHCompile>
         <CppCompile Include="Reader.cpp">
             <VirtualFolder>{8B80B3DC-9137-48C4-B3EF-4806D7D82BCA}</VirtualFolder>
             <DependentOn>Reader.h</DependentOn>
             <BuildOrder>13</BuildOrder>
         </CppCompile>
+        <PCHCompile Include="RgbBlendingPCH1.h">
+            <BuildOrder>0</BuildOrder>
+            <PCH>true</PCH>
+        </PCHCompile>
         <CppCompile Include="RgbData.cpp">
             <VirtualFolder>{8B80B3DC-9137-48C4-B3EF-4806D7D82BCA}</VirtualFolder>
             <DependentOn>RgbData.h</DependentOn>
@@ -272,6 +278,13 @@
             <DependentOn>UnitSeismic3d.h</DependentOn>
             <BuildOrder>27</BuildOrder>
         </CppCompile>
+        <CppCompile Include="UnitSimpleDialog.cpp">
+            <VirtualFolder>{F35ACD7E-016A-4E8E-8A21-05004CE80EF2}</VirtualFolder>
+            <Form>SimpleDialog</Form>
+            <FormType>dfm</FormType>
+            <DependentOn>UnitSimpleDialog.h</DependentOn>
+            <BuildOrder>30</BuildOrder>
+        </CppCompile>
         <CppCompile Include="UnitStatistics.cpp">
             <VirtualFolder>{F35ACD7E-016A-4E8E-8A21-05004CE80EF2}</VirtualFolder>
             <Form>UnitStatistic</Form>
@@ -300,8 +313,10 @@
         <FormResources Include="UnitFormUniversal.dfm"/>
         <FormResources Include="UnitLoading.dfm"/>
         <FormResources Include="UnitSeismic3d.dfm"/>
+        <FormResources Include="UnitSimpleDialog.dfm"/>
         <FormResources Include="UnitStatistics.dfm"/>
         <FormResources Include="Dialog.dfm"/>
+        <FormResources Include="ChooseForm.dfm"/>
         <FormResources Include="import\AxisParameters.dfm"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
@@ -327,12 +342,12 @@
                     <ProjectProperties Name="IndexFiles">False</ProjectProperties>
                 </ProjectProperties>
                 <VFOLDERS>
-                    <VFOLDER ID="{F35ACD7E-016A-4E8E-8A21-05004CE80EF2}" name="UI"/>
                     <VFOLDER ID="{8B80B3DC-9137-48C4-B3EF-4806D7D82BCA}" name="Data"/>
                     <VFOLDER ID="{27FDC0BA-129F-4ADE-9F5F-3DBA97EFA389}" name="Graphics">
                         <VFOLDER ID="{46C88EBE-1344-4FFB-A12B-D8193BB1E075}" name="2D"/>
                         <VFOLDER ID="{DFD7A4AC-5C4B-4AB2-9EE9-8AEC9C6182D8}" name="3D"/>
                     </VFOLDER>
+                    <VFOLDER ID="{F35ACD7E-016A-4E8E-8A21-05004CE80EF2}" name="UI"/>
                 </VFOLDERS>
                 <Excluded_Packages>
                     <Excluded_Packages Name="$(BDSBIN)\bcboffice2k290.bpl">Embarcadero C++Builder Office 2000 Servers Package</Excluded_Packages>
@@ -392,15 +407,15 @@
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName=".\Win32\Debug\Project2.dll" Configuration="Debug" Class="ProjectOutput">
+                <DeployFile LocalName=".\Win32\Debug\RgbBlending" Configuration="Debug" Class="ProjectOutput">
                     <Platform Name="Win32">
-                        <RemoteName>Project2</RemoteName>
+                        <RemoteName>RgbBlending</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>
-                <DeployFile LocalName=".\Win32\Debug\Project2.tds" Configuration="Debug" Class="DebugSymbols">
-                    <Platform Name="Win32">
-                        <RemoteName>Project2.tds</RemoteName>
+                <DeployFile LocalName=".\Win64\Debug\RgbBlending.dll" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win64">
+                        <RemoteName>RgbBlending</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>

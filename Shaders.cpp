@@ -26,7 +26,41 @@ System::UnicodeString fullPath = ExtractFileDir(Application->ExeName) + ("\\shad
 	}
 	return content;
 }
+std::string readSourceFromFile(std::wstring fileName)
+{
+	std::ifstream file(fileName, std::ios::binary);
+	// Читаем побайтово и проверяем каждый символ
+    std::string content;
+    char ch;
+    while (file.get(ch)) {
+		// Пропускаем только нулевые байты, все остальные включаем
+		if (ch != '\0') {
+            content += ch;
+		}
+	}
+	return content;
+}
 
+GLuint compileShaderFromFile(GLenum type, std::wstring fileName)
+{
+	const char* source = readSourceFromFile(fileName).c_str();
+	//ShowMessage(source);
+	GLuint shader = glCreateShader(type);
+	glShaderSource(shader, 1, &source, NULL);
+	glCompileShader(shader);
+	GLint success;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+	if (!success)
+	{
+		char infoLog[512];
+		glGetShaderInfoLog(shader, 512, NULL, infoLog);
+		std::cerr << "CompileErr" << std::endl << infoLog << std::endl;
+		ShowMessage(infoLog);
+		glDeleteShader(shader);
+		throw std::exception(infoLog);
+	}
+	return shader;
+}
 GLuint compileShader(GLenum type, std::string fileName)
 {
 	const char* source = readSource(fileName.c_str()).c_str();
@@ -103,3 +137,28 @@ GLuint createShaderProgram(std::string vert, std::string frag, std::string geom)
 	return program;
 }
 
+GLuint createShaderProgramFromFile(std::wstring fragLoc)
+{
+	GLuint vertexShader = compileShader(GL_VERTEX_SHADER, "universal.vert");
+	GLuint fragmentShader = compileShaderFromFile(GL_FRAGMENT_SHADER, fragLoc);
+	if (!vertexShader || !fragmentShader)
+	{
+		return 0;
+	}
+	GLuint program = glCreateProgram();
+    glAttachShader(program, vertexShader);
+    glAttachShader(program, fragmentShader);
+    glLinkProgram(program);
+    GLint success;
+	glGetProgramiv(program, GL_LINK_STATUS, &success);
+	if (!success)
+	{
+        char infoLog[512];
+        glGetProgramInfoLog(program, 512, NULL, infoLog);
+		ShowMessage(infoLog);
+		throw std::exception(infoLog);
+	}
+    glDeleteShader(vertexShader);
+	glDeleteShader(fragmentShader);
+    return program;
+}

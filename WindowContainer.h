@@ -3,6 +3,7 @@
 #include "InterfacesWindow.h"
 #include "InterfacesData.h"
 #include "axis.h"
+#include "Shaders.h"
 
 #ifndef WindowContainerH
 #define WindowContainerH
@@ -20,6 +21,7 @@ struct viewParams {
     float contrast;
 };
 
+
 class TWindowContainer : public TPanel
 {
 private:
@@ -28,10 +30,13 @@ private:
 
 	TImage* image1;
 	TImage* image2;
+    TImage* image3;
+    TImage* image4;
 
 	WindowType type = WindowType::NONE;
 	TAxis2* axis = new TAxis2(false);
 	TAxis2* axisY = new TAxis2(false);
+    TAxis2* axisYR = new TAxis2(false);
 	TPanel* viewPanel;
 
 	int posx_ = 0;
@@ -46,6 +51,7 @@ private:
 	std::map<TObject*, std::function<void()>> func;
 
     std::function<void(int)> callback = [](int p){};
+    std::function<void(int, int)> callbackDisp = [](int p, int s){};
 protected:
 	std::unique_ptr<IWindow> window;
 	std::shared_ptr<ColorManager> colorManager = std::make_shared<ColorManager>();
@@ -59,12 +65,13 @@ protected:
 	void setupButtons();
 	void setupFlatButtons();
 	void setupSeisButtons();
-//	void setupRgbButtons();
+	void setupRgbButtons();
 	void setupVolumButtons();
 	void createWindow(const std::shared_ptr<IBaseData>& newData);
     void createWindow(const std::shared_ptr<IBaseData>& newData, int pos);
 public:
-    void setTraceCallback(std::function<void(int)> callback_){callback= callback_;};
+    void setTraceCallback(std::function<void(int)> callback_){callback = callback_;};
+    void setDisplayCallback(std::function<void(int, int)> callback_){callbackDisp = callback_;};
 	static std::vector<TWindowContainer*> instances_;
 	int getFreqSize();
     float getFreqByIndex(int idx);
@@ -72,6 +79,7 @@ public:
 	TPopupMenu *FPopupMenu = new TPopupMenu(this);
 	void updateAxis(bool reEval);
 	static void __fastcall emitToAll();
+    void setRatio();
 	void __fastcall LockClick(TObject* Sender);
 	__fastcall TWindowContainer(TComponent* Owner);
 	__fastcall ~TWindowContainer();
@@ -79,8 +87,15 @@ public:
 	void initialize();
     void setFile(std::wstring fName) {fileName = fName;};
 	void addButton(std::string caption, std::function<void()> function);
+    void changePalette();
+    void changeShader(GLuint shaderProgram);
 	TMenuItem*	syncButton;
     void saveFile(std::wstring path);
+	void saveScreenshot(System::UnicodeString path);
+    void saveVolScreenshot(System::UnicodeString path);
+    void SaveHorizon(const std::wstring& filename, const std::wstring& fileext);
+	void LoadHorizon(const std::wstring& filename, const std::wstring& fileext);
+    void checkAxis(bool left, bool top, bool right);
 };
 
 #endif

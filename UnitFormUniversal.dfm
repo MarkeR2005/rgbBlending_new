@@ -41,16 +41,17 @@ object FormUniversal: TFormUniversal
     Width = 582
     Height = 65
     Align = alTop
-    Caption = 'Panel2'
-    Enabled = False
+    Color = clInfoBk
+    ParentBackground = False
     TabOrder = 1
-    Visible = False
     object Panel3: TPanel
       Left = 1
       Top = 1
       Width = 580
       Height = 20
       Align = alTop
+      Color = clRed
+      ParentBackground = False
       TabOrder = 0
       object CheckBoxR: TCheckBox
         Left = 1
@@ -59,6 +60,10 @@ object FormUniversal: TFormUniversal
         Height = 18
         Align = alLeft
         Caption = 'R'
+        Checked = True
+        Color = clRed
+        ParentColor = False
+        State = cbChecked
         TabOrder = 0
         OnClick = CheckBoxBClick
       end
@@ -68,16 +73,18 @@ object FormUniversal: TFormUniversal
         Width = 135
         Height = 18
         Align = alRight
+        Color = clRed
+        ParentBackground = False
         TabOrder = 1
         object LabelR: TLabel
           Left = 1
           Top = 1
-          Width = 133
-          Height = 16
+          Width = 7
+          Height = 15
           Align = alClient
           Caption = 'R'
-          ExplicitWidth = 7
-          ExplicitHeight = 15
+          Color = clRed
+          ParentColor = False
         end
       end
       object ScrollBarR: TScrollBar
@@ -97,6 +104,8 @@ object FormUniversal: TFormUniversal
       Width = 580
       Height = 23
       Align = alTop
+      Color = clBlue
+      ParentBackground = False
       TabOrder = 1
       object CheckBoxB: TCheckBox
         Left = 1
@@ -105,6 +114,10 @@ object FormUniversal: TFormUniversal
         Height = 21
         Align = alLeft
         Caption = 'B'
+        Checked = True
+        Color = clBlue
+        ParentColor = False
+        State = cbChecked
         TabOrder = 0
         OnClick = CheckBoxBClick
       end
@@ -114,16 +127,18 @@ object FormUniversal: TFormUniversal
         Width = 135
         Height = 21
         Align = alRight
+        Color = clBlue
+        ParentBackground = False
         TabOrder = 1
         object LabelB: TLabel
           Left = 1
           Top = 1
-          Width = 133
-          Height = 19
+          Width = 7
+          Height = 15
           Align = alClient
           Caption = 'B'
-          ExplicitWidth = 7
-          ExplicitHeight = 15
+          Color = clBlue
+          ParentColor = False
         end
       end
       object ScrollBarB: TScrollBar
@@ -143,6 +158,8 @@ object FormUniversal: TFormUniversal
       Width = 580
       Height = 21
       Align = alTop
+      Color = clGreen
+      ParentBackground = False
       TabOrder = 2
       object CheckBoxG: TCheckBox
         Left = 1
@@ -151,6 +168,10 @@ object FormUniversal: TFormUniversal
         Height = 19
         Align = alLeft
         Caption = 'G'
+        Checked = True
+        Color = clGreen
+        ParentColor = False
+        State = cbChecked
         TabOrder = 0
         OnClick = CheckBoxBClick
       end
@@ -160,16 +181,18 @@ object FormUniversal: TFormUniversal
         Width = 135
         Height = 19
         Align = alRight
+        Color = clGreen
+        ParentBackground = False
         TabOrder = 1
         object LabelG: TLabel
           Left = 1
           Top = 1
-          Width = 133
-          Height = 17
+          Width = 8
+          Height = 15
           Align = alClient
           Caption = 'G'
-          ExplicitWidth = 8
-          ExplicitHeight = 15
+          Color = clGreen
+          ParentColor = False
         end
       end
       object ScrollBarG: TScrollBar
@@ -191,6 +214,8 @@ object FormUniversal: TFormUniversal
       Caption = 'File'
       object OpenAs: TMenuItem
         Caption = 'Open as '
+        Enabled = False
+        Visible = False
         OnClick = OpenAsClick
       end
       object SaveAs: TMenuItem
@@ -199,11 +224,19 @@ object FormUniversal: TFormUniversal
       end
       object OpenAsHor: TMenuItem
         Caption = 'Open Horizon as'
+        Enabled = False
+        Visible = False
         OnClick = OpenAsHorF
       end
       object SaveAsHor: TMenuItem
         Caption = 'Save Horizon as'
+        Enabled = False
+        Visible = False
         OnClick = SaveAsHorF
+      end
+      object SaveScreenShot1: TMenuItem
+        Caption = 'Save ScreenShot'
+        OnClick = SaveScreenShot1Click
       end
     end
     object View1: TMenuItem
@@ -214,6 +247,7 @@ object FormUniversal: TFormUniversal
       end
       object ControlPanel: TMenuItem
         Caption = 'ControlPanel'
+        Checked = True
         OnClick = ControlPanelClick
       end
       object LeftAxe: TMenuItem
@@ -221,10 +255,30 @@ object FormUniversal: TFormUniversal
         Checked = True
         OnClick = LeftAxeClick
       end
+      object RightAxe: TMenuItem
+        Caption = 'RightAxe'
+        Checked = True
+        OnClick = RightAxeClick
+      end
       object TopAxe: TMenuItem
         Caption = 'TopAxe'
         Checked = True
         OnClick = TopAxeClick
+      end
+      object Changepalette1: TMenuItem
+        Caption = 'Change palette'
+        Visible = False
+        OnClick = Changepalette1Click
+      end
+      object Changeshader1: TMenuItem
+        Caption = 'Change shader'
+        Enabled = False
+        Visible = False
+        OnClick = Changeshader1Click
+      end
+      object SetRatio1: TMenuItem
+        Caption = 'SetRatio'
+        OnClick = SetRatio1Click
       end
     end
   end

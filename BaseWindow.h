@@ -24,7 +24,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
     void DestroyWindow();
 	//--
 	virtual void initWindow(TPanel* parent) override;
-	void setShaderProgram(GLuint program);
+	void setShaderProgram(GLuint program) override;
 	void resizeWindow(int _width, int _height) override;
 
 	virtual void preRender();
@@ -34,6 +34,8 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	virtual void postRender();
 
 	virtual void renderWindow() override;
+    void renderForScreenshot() override;
+    Graphics::TBitmap* getScreenshotAsBitmap() override;
 
 	//Getters
 	void getOffset(float& ox, float& oy) override{ox = offsetX;oy = offsetY;};

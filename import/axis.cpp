@@ -1,6 +1,7 @@
 //---------------------------------------------------------------------------
 #include "axis.h"
 #include "AxisParameters.h"
+#include <algorithm>
 #pragma hdrstop
 
 
@@ -235,7 +236,6 @@ double startSample=start;
 stepSample=(double)size/(double)pixelsBetweenPiks;
 if (stepSample<1) stepSample=1;
 stepSample = fabs((end-start)/stepSample);
-
 //Авто-подбор шага по дискретам
 double roundSteps[26] = {0.1, 0.5, 1, 2, 5, 10, 20, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000, 10000000, 20000000, 50000000, 100000000};
 if (params->automatic)
@@ -281,14 +281,13 @@ axe[picsCount-1].pickCoord2.x=7; axe[picsCount-1].pickCoord2.y=axe[picsCount-1].
 axe[picsCount-1].signCoord.x=10; axe[picsCount-1].signCoord.y=axe[picsCount-1].pickCoord1.y-halfSignHeight;
 axe[picsCount-1].sign = FloatToStrF(end,ffGeneral,8,2);
 axeBitmap->Width = 2+Max(axeBitmap->Canvas->TextWidth(String(start)), axeBitmap->Canvas->TextWidth(String(end))) + 10;
-axeBitmap->Height = size+halfSignHeight*2;
+axeBitmap->Height = std::max(1,size+halfSignHeight*2);
 //Отрисовка оси
 axeBitmap->Canvas->Pen->Color=params->backColor;
 axeBitmap->Canvas->Brush->Color=params->backColor;
 axeBitmap->Canvas->Pen->Width=params->majorPicksWidth;
 axeBitmap->Canvas->Rectangle(TRect(0,0,axeBitmap->Width,axeBitmap->Height));
 axeBitmap->Canvas->Pen->Color=params->picksColor;
-
 if (left) {
   for (int i=0; i<axe.Length; i++) {
     axeBitmap->Canvas->MoveTo(axeBitmap->Width-axe[i].pickCoord1.x, axe[i].pickCoord1.y);
@@ -353,14 +352,14 @@ int bmpHeight = axeBitmap->Canvas->TextHeight(UnicodeString(intervals[0].startVa
 axeBitmap->Canvas->Pen->Color=params->backColor;
 axeBitmap->Canvas->Brush->Color=params->backColor;
 axeBitmap->Canvas->Pen->Width=params->majorPicksWidth;
-
 if (!forPlanshet) {
-	axeBitmap->Width=bmpWidth; axeBitmap->Height=bmpHeight;
-	axeBitmap->Canvas->Rectangle(0,0,bmpWidth,bmpHeight);
+	axeBitmap->Width=std::min(std::max(1,bmpWidth),32767); axeBitmap->Height=std::min(std::max(1,bmpHeight),32767);
+	axeBitmap->Canvas->Rectangle(0,0,std::max(1,bmpWidth),std::max(1, bmpHeight));
 } else shiftOfPicks=0; //чтобы не вычитать его потом
 /////////////////////////////////////////////////////////
 int shiftOfInterval=0;
 int narrowLabels=params->automatic; if (narrowLabels==0) narrowLabels=1;
+
 for (int i=0; i<intervals.Length; i++) {
 	int sL = String(intervals[i].startValue).Length();
 	int eL = String(intervals[i].endValue).Length();

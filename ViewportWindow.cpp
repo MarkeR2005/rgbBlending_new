@@ -143,6 +143,7 @@ void ViewportWindow::render() {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glDepthMask(GL_FALSE); // Отключаем запись в буфер глубины для прозрачных объектов
+        glDisable(GL_CULL_FACE);
 
         for (auto& plane : transparentPlanes) {
             plane->render(m_viewMatrix, m_projectionMatrix);

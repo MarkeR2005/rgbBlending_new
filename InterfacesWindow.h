@@ -54,6 +54,7 @@ class ISyncWindow
  class IFlatWindow
 {
 	public:
+    virtual void setShaderProgram(GLuint program) = 0;
 	virtual void getOffset(float& ox, float& oy) = 0;
 	virtual void getRatio(float& rx, float& ry) = 0;
 	virtual float getZoom() = 0;
@@ -67,6 +68,9 @@ class ISyncWindow
 	virtual void setDT(float dT_) = 0;
 	virtual void setContrast (float c) = 0;
 	virtual void setHorizon(const std::vector<float>& data) = 0;
+
+    virtual void renderForScreenshot() = 0;
+    virtual Graphics::TBitmap* getScreenshotAsBitmap() = 0;
 };
 class IRgbWindow
 {
@@ -79,6 +83,9 @@ class IRgbWindow
 	public:
 	virtual void setCamera(const glm::vec3& position, const glm::vec3& target, const glm::vec3& up) = 0;
 	virtual void setPerspective(float fov, float nearPlane, float farPlane) = 0;
+
+    virtual void setChannels(int red, int green, int blue) = 0;
+    virtual void setChannelEnabled(bool red, bool green, bool blue) = 0;
 
 	virtual void addPlane(std::shared_ptr<AbstractPlane> plane) = 0;
 	virtual void removePlane(std::shared_ptr<AbstractPlane> plane) = 0;

@@ -28,7 +28,7 @@ void FlatWindow::initWindow(TPanel* parent)
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-	glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
+	//glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
 	handle = glfwCreateWindow(parent->Width, parent->Height, "MAIN", NULL, NULL);
 	//Проверка инициализации
 	if (!handle)
@@ -279,7 +279,6 @@ void FlatWindow::postRender()
 
 	renderHighlights();
 	renderHorizons();
-	glfwSwapBuffers(handle);
 }
 //--
 void FlatWindow::renderWindow(){};
@@ -479,7 +478,7 @@ void FlatWindow::clampOffsets() {
 		updateGPUPoint(startIdx, endIdx);
 	}
 
-	void FlatWindow::setMouseButtonCallback(std::function<void(int, int, int)> callback){
+		void FlatWindow::setMouseButtonCallback(std::function<void(int, int, int)> callback){
 	mouseButtonCallback = callback;
 }
 void FlatWindow::setCursorPosCallback(std::function<void(double, double)> callback){
@@ -490,4 +489,41 @@ void FlatWindow::setScrollCallback(std::function<void(double, double)> callback)
 }
 void FlatWindow::setCursorEnterCallback(std::function<void(int)> callback){
 	cursorEnterCallback = callback;
+}
+
+void FlatWindow::renderForScreenshot()
+{
+}
+
+Graphics::TBitmap* FlatWindow::getScreenshotAsBitmap()
+{
+if (!handle) return nullptr;
+Graphics::TBitmap* bmp = new Graphics::TBitmap;
+bmp->PixelFormat = pf24bit;
+float tzoom = zoom;
+//--
+float toffsetX = offsetX, toffsetY = offsetY;
+float tWidth = Wwidth , tHeight = Wheight;
+
+zoom = 1.0f;
+offsetX = 0.0f;
+offsetY = 0.0f;
+Wwidth = width/pixelRatioX;
+Wheight = height/pixelRatioY;
+glfwSetWindowSize(handle, Wwidth, Wheight);
+bmp->Width = Wwidth;
+bmp->Height = Wheight+50;
+renderForScreenshot();
+glPixelStorei(GL_PACK_ALIGNMENT, 1);
+for (int y = 0; y < Wheight; y++) {
+    glReadPixels(0, y, Wwidth, 1, GL_BGR, GL_UNSIGNED_BYTE, bmp->ScanLine[Wheight -1 - y]);
+}
+
+zoom = tzoom;
+offsetX = toffsetX ;
+offsetY = toffsetY;
+Wwidth = tWidth;
+Wheight = tHeight;
+glfwSetWindowSize(handle, Wwidth, Wheight);
+return bmp;
 }

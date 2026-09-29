@@ -7,6 +7,8 @@
 #include "Reader.h"
 #include "DataMath.h"
 #include "Dialog.h"
+#include "Shaders.h"
+#include <System.IOUtils.hpp>
 
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -16,10 +18,11 @@ TFormUniversal *FormUniversal;
 __fastcall TFormUniversal::TFormUniversal(TComponent* Owner, System::UnicodeString path_)
 	: TForm(Owner), path(path_)
 {
+    Caption=path_;
 	SaveDialog1->Title = "Save your data with internal format";
 	SaveDialog1->Filter = "Seismic files (*.sd)|*.sd|RGB files (*.rgb)|*.rgb";
 	SaveDialog1->DefaultExt = "sd";
-	SaveDialog1->FileName = "MyData.sd";
+	SaveDialog1->FileName = "MyData.rgb";
 
 	SaveDialog2->Title = "Save your horizon";
 	SaveDialog2->Filter = "Text files (*.txt)|*.txt|Table files (*.csv)|*.csv|Binary files (*.dat)|*.dat";
@@ -107,6 +110,9 @@ void __fastcall TFormUniversal::SaveAsF(TObject *Sender)
 	TAbstractDialog* dialog = new TAbstractDialog(nullptr);
     dialog->AddInput<std::string>("Название", name);
     if (dialog->Execute() && dialog->ContinuePressed) {
+        if (!DirectoryExists(path)) {
+        	CreateDirectory(path.c_str(), NULL);
+        }
     	windowContainer->saveFile((path+("\\"+name).c_str()).c_str());
     }
     delete dialog;
@@ -150,36 +156,36 @@ void __fastcall TFormUniversal::SaveAsF(TObject *Sender)
 //---------------------------------------------------------------------------
 void __fastcall TFormUniversal::SaveAsHorF(TObject *Sender)
 {
-//	if (panel1==nullptr) {
-//		return;
-//	}
-//	if (SaveDialog2->Execute())
-//	{
-//		std::wstring fileName = SaveDialog2->FileName.c_str();
-//		std::wstring fileExt = ExtractFileExt(SaveDialog2->FileName).c_str();
-//		try {
-//			panel1->SaveHorizon(fileName, fileExt);
-//		} catch (...) {
-//			ShowMessage("Bad Horizon");
-//		}
-//	}
+	if (windowContainer==nullptr) {
+		return;
+	}
+	if (SaveDialog2->Execute())
+	{
+		std::wstring fileName = SaveDialog2->FileName.c_str();
+		std::wstring fileExt = ExtractFileExt(SaveDialog2->FileName).c_str();
+		try {
+			windowContainer->SaveHorizon(fileName, fileExt);
+		} catch (...) {
+			ShowMessage("Bad Horizon");
+		}
+	}
 }
 //---
 void __fastcall TFormUniversal::OpenAsHorF(TObject *Sender)
 {
-//	if (panel1==nullptr) {
-//		return;
-//	}
-//	if (OpenDialog1->Execute())
-//	{
-//		std::wstring fileName = OpenDialog1->FileName.c_str();
-//		std::wstring fileExt = ExtractFileExt(OpenDialog1->FileName).c_str();
-//		try {
-//			panel1->LoadHorizon(fileName, fileExt);
-//		} catch (...) {
-//			ShowMessage("Bad Horizon");
-//		}
-//	}
+	if (windowContainer==nullptr) {
+		return;
+	}
+	if (OpenDialog1->Execute())
+	{
+		std::wstring fileName = OpenDialog1->FileName.c_str();
+		std::wstring fileExt = ExtractFileExt(OpenDialog1->FileName).c_str();
+		try {
+			windowContainer->LoadHorizon(fileName, fileExt);
+		} catch (...) {
+			ShowMessage("Bad Horizon");
+		}
+	}
 }
 
 
@@ -244,29 +250,94 @@ void __fastcall TFormUniversal::ScrollBarRChange(TObject *Sender)
 //		return;
 //	}
 //	point3F res = static_cast<TRgbPanel*>(panel1)->ScrollBarChange(ScrollBarR->Position,ScrollBarG->Position,ScrollBarB->Position);
-	LabelR->Caption = (std::to_string(windowContainer->getFreqByIndex(ScrollBarR->Position)) + " hz").c_str();
-	LabelG->Caption = (std::to_string(windowContainer->getFreqByIndex(ScrollBarG->Position)) + " hz").c_str();
-	LabelB->Caption = (std::to_string(windowContainer->getFreqByIndex(ScrollBarB->Position)) + " hz").c_str();
+	LabelR->Caption = FloatToStrF(windowContainer->getFreqByIndex(ScrollBarR->Position),ffFixed, 4, 2) + L" hz";
+	LabelG->Caption = FloatToStrF(windowContainer->getFreqByIndex(ScrollBarG->Position),ffFixed, 4, 2) + L" hz";
+	LabelB->Caption = FloatToStrF(windowContainer->getFreqByIndex(ScrollBarB->Position),ffFixed, 4, 2) + L" hz";
 }
 //---------------------------------------------------------------------------
 
 void __fastcall TFormUniversal::LeftAxeClick(TObject *Sender)
 {
-//	if (panel1 == nullptr) {
-//		return;
-//	}
-//	LeftAxe->Checked = !LeftAxe->Checked;
-//	panel1->image1->Visible = LeftAxe->Checked;
+	if (windowContainer==nullptr) {
+		return;
+	}
+	LeftAxe->Checked = !LeftAxe->Checked;
+	windowContainer->checkAxis(LeftAxe->Checked,TopAxe->Checked, RightAxe->Checked);
+}
+void __fastcall TFormUniversal::TopAxeClick(TObject *Sender)
+{
+	if (windowContainer==nullptr) {
+		return;
+	}
+	TopAxe->Checked = !TopAxe->Checked;
+	windowContainer->checkAxis(LeftAxe->Checked,TopAxe->Checked, RightAxe->Checked);
 }
 //---------------------------------------------------------------------------
 
-void __fastcall TFormUniversal::TopAxeClick(TObject *Sender)
+void __fastcall TFormUniversal::SetRatio1Click(TObject *Sender)
 {
-//	if (panel1 == nullptr) {
-//		return;
-//	}
-//	TopAxe->Checked = !TopAxe->Checked;
-//	panel1->image2->Visible = TopAxe->Checked;
+	if (windowContainer==nullptr) {
+		return;
+	}
+    windowContainer->setRatio();
 }
 //---------------------------------------------------------------------------
+
+//---------------------------------------------------------------------------
+
+void __fastcall TFormUniversal::Changepalette1Click(TObject *Sender)
+{
+	if (windowContainer==nullptr) {
+		return;
+	}
+    windowContainer->changePalette();
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TFormUniversal::Changeshader1Click(TObject *Sender)
+{
+	if (OpenDialog1->Execute())
+	{
+		std::wstring fileName = OpenDialog1->FileName.c_str();
+		std::wstring fileExt = ExtractFileExt(OpenDialog1->FileName).c_str();
+		//this->Caption = fileName.c_str();
+		bool success = false;
+		if (fileExt == L".frag") {
+            GLuint sp;
+			try {
+				sp = createShaderProgramFromFile(fileName);
+				success = true;
+			} catch (...) {
+			}
+			if (success) {
+				if (windowContainer==nullptr) {
+                    return;
+                }
+                windowContainer->changeShader(sp);
+			}
+		}
+    }
+}
+//---------------------------------------------------------------------------
+
+
+void __fastcall TFormUniversal::SaveScreenShot1Click(TObject *Sender)
+{
+    if (windowContainer==nullptr) {
+        return;
+    }
+    windowContainer->saveScreenshot(TPath::GetDirectoryName(TPath::GetDirectoryName(TPath::GetDirectoryName(path)))+L"\\pictures\\");
+}
+//---------------------------------------------------------------------------
+
+void __fastcall TFormUniversal::RightAxeClick(TObject *Sender)
+{
+    if (windowContainer==nullptr) {
+		return;
+	}
+	RightAxe->Checked = !RightAxe->Checked;
+	windowContainer->checkAxis(LeftAxe->Checked,TopAxe->Checked, RightAxe->Checked);
+}
+//---------------------------------------------------------------------------
+
 

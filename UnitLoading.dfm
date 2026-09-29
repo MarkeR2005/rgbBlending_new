@@ -4,13 +4,12 @@ object Loading: TLoading
   Caption = 'Loading'
   ClientHeight = 112
   ClientWidth = 349
-  Color = clBtnFace
+  Color = clInfoBk
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
   Font.Height = -12
   Font.Name = 'Segoe UI'
   Font.Style = []
-  PixelsPerInch = 96
   TextHeight = 15
   object ProgressBar1: TProgressBar
     Left = 16

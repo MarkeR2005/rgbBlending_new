@@ -137,6 +137,7 @@ void __fastcall TSeismic3d::AddClick(TObject *Sender)
 					norm,   // нормаль (смотрит вперед)
 					_sz,         // размер
 					seismicShader,
+                    [](){return std::make_shared<SeismicData>();},
 					flipV,
                     flipH
 				);
@@ -179,6 +180,7 @@ void __fastcall TSeismic3d::AddClick(TObject *Sender)
 					norm,   // нормаль (смотрит вперед)
 					_sz,         // размер
 					rgbShader,
+					[](){return std::make_shared<RgbData>();},
 					flipV,
                     flipH
 				);

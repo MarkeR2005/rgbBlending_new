@@ -12,6 +12,7 @@
 #include <memory>
 #include <functional>
 #include "Structures.h"
+#include "InterfacesData.h"
 
 class AbstractPlane {
 protected:
@@ -75,6 +76,7 @@ public:
 
     // ƒл€ вычислени€ пересечений с другими плоскост€ми
 	virtual bool intersectsWith(const AbstractPlane& other, glm::vec3& linePoint, glm::vec3& lineDir) const;
-    	virtual float calculateDistanceToCamera(const glm::vec3& cameraPos) const;
+		virtual float calculateDistanceToCamera(const glm::vec3& cameraPos) const;
+    virtual std::shared_ptr<IBaseData> getData() = 0;
 };
 #endif

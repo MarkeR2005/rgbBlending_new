@@ -1,12 +1,362 @@
-//---------------------------------------------------------------------------
+﻿//---------------------------------------------------------------------------
 
 #pragma hdrstop
 
 #include "DataCalculator.h"
 #include <string>
+#include <memory>
+#include <vector>
+#include <cmath>
+#include <queue>
+#include <numeric>
 #include "UnitLoading.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
+
+// Вычисление доминирующей частоты с параболической интерполяцией
+static float computeDominantFreq(const std::vector<float>& spectrum, const std::vector<float>& freqs) {
+    int maxIdx = 0;
+    float maxVal = spectrum[0];
+    for (size_t i = 1; i < spectrum.size(); ++i) {
+        if (spectrum[i] > maxVal) {
+            maxVal = spectrum[i];
+            maxIdx = (int)i;
+        }
+    }
+    // Интерполяция, если возможно
+    if (maxIdx > 0 && maxIdx < (int)spectrum.size()-1) {
+        float a = spectrum[maxIdx-1];
+        float b = spectrum[maxIdx];
+        float c = spectrum[maxIdx+1];
+        float offset = 0.5f * (a - c) / (a - 2.0f*b + c);
+        if (std::isfinite(offset)) {
+            float idx = maxIdx + offset;
+            // Линейная интерполяция по частотам
+            float f0 = freqs[maxIdx];
+            float f1 = freqs[maxIdx+1];
+            return f0 + (f1 - f0) * offset;
+        }
+    }
+    return freqs[maxIdx];
+}
+
+// Поле доминирующей частоты (traces x samples)
+static std::vector<std::vector<float>> computeDominantFreqField(const std::shared_ptr<RgbData>& input) {
+    const auto& rawData = input->getRawData(); // [freq][trace][sample]
+    size_t nFreq = rawData.size();
+    size_t nTraces = rawData[0].size();
+    size_t nSamples = rawData[0][0].size();
+    std::vector<float> freqs = input->getFreqs();
+    if (freqs.size() != nFreq) {
+        // fallback
+        freqs.resize(nFreq);
+        for (size_t i = 0; i < nFreq; ++i) freqs[i] = (float)i / (nFreq-1);
+    }
+
+    std::vector<std::vector<float>> field(nTraces, std::vector<float>(nSamples, 0.0f));
+    for (size_t tr = 0; tr < nTraces; ++tr) {
+        for (size_t sm = 0; sm < nSamples; ++sm) {
+            std::vector<float> spectrum(nFreq);
+            for (size_t f = 0; f < nFreq; ++f)
+                spectrum[f] = rawData[f][tr][sm];
+            field[tr][sm] = computeDominantFreq(spectrum, freqs);
+        }
+    }
+    return field;
+}
+
+// Градиент по времени (вдоль samples)
+static std::vector<std::vector<float>> gradientT(const std::vector<std::vector<float>>& field) {
+    size_t nTraces = field.size();
+    if (nTraces == 0) return {};
+    size_t nSamples = field[0].size();
+    std::vector<std::vector<float>> grad(nTraces, std::vector<float>(nSamples, 0.0f));
+    for (size_t tr = 0; tr < nTraces; ++tr) {
+        for (size_t sm = 1; sm < nSamples-1; ++sm)
+            grad[tr][sm] = (field[tr][sm+1] - field[tr][sm-1]) * 0.5f;
+        if (nSamples > 1) {
+            grad[tr][0] = field[tr][1] - field[tr][0];
+            grad[tr][nSamples-1] = field[tr][nSamples-1] - field[tr][nSamples-2];
+        }
+    }
+    return grad;
+}
+
+// Градиент по трассам (вдоль x)
+static std::vector<std::vector<float>> gradientX(const std::vector<std::vector<float>>& field) {
+    size_t nTraces = field.size();
+    if (nTraces == 0) return {};
+    size_t nSamples = field[0].size();
+    std::vector<std::vector<float>> grad(nTraces, std::vector<float>(nSamples, 0.0f));
+    for (size_t tr = 1; tr < nTraces-1; ++tr)
+        for (size_t sm = 0; sm < nSamples; ++sm)
+            grad[tr][sm] = (field[tr+1][sm] - field[tr-1][sm]) * 0.5f;
+    if (nTraces > 1) {
+        for (size_t sm = 0; sm < nSamples; ++sm) {
+            grad[0][sm] = field[1][sm] - field[0][sm];
+            grad[nTraces-1][sm] = field[nTraces-1][sm] - field[nTraces-2][sm];
+        }
+    }
+    return grad;
+}
+// Точка с вектором признаков и исходным индексом
+struct PointV {
+    std::vector<float> coords;
+    int idx;
+};
+
+// Узел KD-дерева
+struct KDNode {
+    PointV point;
+    KDNode* left = nullptr;
+    KDNode* right = nullptr;
+    int axis = 0;
+
+    ~KDNode() { delete left; delete right; }
+};
+
+// Функция сравнения для сортировки по выбранной оси
+static bool compareByAxis(const PointV& a, const PointV& b, int axis) {
+    return a.coords[axis] < b.coords[axis];
+}
+
+// Построение KD-дерева из списка точек (рекурсивно)
+static KDNode* buildKDTree(std::vector<PointV>& points, int depth = 0) {
+    if (points.empty()) return nullptr;
+
+    int k = points[0].coords.size(); // размерность
+    int axis = depth % k;
+
+    // Находим медиану
+    size_t mid = points.size() / 2;
+    std::nth_element(points.begin(), points.begin() + mid, points.end(),
+        [axis](const PointV& a, const PointV& b) {
+            return a.coords[axis] < b.coords[axis];
+        });
+
+    KDNode* node = new KDNode();
+    node->point = points[mid];
+    node->axis = axis;
+
+    std::vector<PointV> leftPoints(points.begin(), points.begin() + mid);
+    std::vector<PointV> rightPoints(points.begin() + mid + 1, points.end());
+
+    node->left = buildKDTree(leftPoints, depth + 1);
+    node->right = buildKDTree(rightPoints, depth + 1);
+
+    return node;
+}
+static void preprocessForPearson(std::vector<std::vector<float>>& points) {
+    for (auto& p : points) {
+        // 1. Вычисляем среднее значение вектора
+        float mean = 0.0f;
+        for (float v : p) mean += v;
+        mean /= p.size();
+
+        // 2. Вычитаем среднее (центрирование)
+        for (float& v : p) v -= mean;
+
+        // 3. Вычисляем L2-норму
+        float norm = 0.0f;
+        for (float v : p) norm += v * v;
+        norm = std::sqrt(norm);
+
+        // 4. Нормализуем (если норма не нулевая)
+        if (norm > 1e-9f) {
+            for (float& v : p) v /= norm;
+        }
+        // Если норма = 0, то оставляем нулевой вектор (он будет давать корреляцию неопределённой)
+    }
+}
+// Поиск всех соседей в радиусе eps с использованием KD-дерева
+static void radiusSearch(KDNode* node, const PointV& target, float eps,
+                         std::vector<int>& neighbors, float epsSq) {
+    if (!node) return;
+
+    // Вычисляем квадрат расстояния до текущей точки
+    float distSq = 0.0f;
+    for (size_t i = 0; i < target.coords.size(); ++i) {
+        float diff = node->point.coords[i] - target.coords[i];
+        distSq += diff * diff;
+    }
+    if (distSq <= epsSq) {
+        neighbors.push_back(node->point.idx);
+    }
+
+    int axis = node->axis;
+    float diff = target.coords[axis] - node->point.coords[axis];
+
+    // Сначала исследуем сторону, которая содержит целевую точку
+    KDNode* first = (diff <= 0) ? node->left : node->right;
+    KDNode* second = (diff <= 0) ? node->right : node->left;
+
+    radiusSearch(first, target, eps, neighbors, epsSq);
+
+    // Если сфера пересекает разделяющую плоскость, исследуем вторую сторону
+    if (diff * diff <= epsSq) {
+        radiusSearch(second, target, eps, neighbors, epsSq);
+    }
+}
+
+// Обёртка для удобства
+static std::vector<int> findNeighbors(KDNode* root, const std::vector<float>& targetCoords,
+                                      int targetIdx, float eps) {
+    PointV target{targetCoords, targetIdx};
+    std::vector<int> neighbors;
+    float epsSq = eps * eps;
+    radiusSearch(root, target, eps, neighbors, epsSq);
+    return neighbors;
+}
+
+static float euclideanDistance(const std::vector<float>& a, const std::vector<float>& b) {
+    float sum = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i) {
+        float diff = a[i] - b[i];
+        sum += diff * diff;
+    }
+    return std::sqrt(sum);
+}
+static float cosineDistance(const std::vector<float>& a, const std::vector<float>& b) {
+    float dot = 0.0f, normA = 0.0f, normB = 0.0f;
+    for (size_t i = 0; i < a.size(); ++i) {
+        dot += a[i] * b[i];
+        normA += a[i] * a[i];
+        normB += b[i] * b[i];
+    }
+    if (normA < 1e-9f || normB < 1e-9f) return 1.0f; // нулевой вектор – максимальное расстояние
+    float cosTheta = dot / (std::sqrt(normA) * std::sqrt(normB));
+    // Ограничиваем из-за погрешностей
+    if (cosTheta > 1.0f) cosTheta = 1.0f;
+    if (cosTheta < -1.0f) cosTheta = -1.0f;
+    return 1.0f - cosTheta; // расстояние в [0,2]
+}
+
+static float estimateEps(const std::vector<std::vector<float>>& points, int k = 5, double percentile = 0.9) {
+    const int n = points.size();
+    const int sampleSize = std::min(5000, n); // не более 5000 точек для скорости
+    std::vector<int> indices(n);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::random_shuffle(indices.begin(), indices.end());
+
+    std::vector<float> kDistances;
+    kDistances.reserve(sampleSize);
+
+    for (int i = 0; i < sampleSize; ++i) {
+        int idx = indices[i];
+        // Собрать расстояния до всех других точек
+        std::vector<float> dists;
+        dists.reserve(n - 1);
+        for (int j = 0; j < n; ++j) {
+            if (j == idx) continue;
+            dists.push_back(euclideanDistance(points[idx], points[j]));
+        }
+        // Найти k-е наименьшее расстояние (k-й сосед)
+        std::nth_element(dists.begin(), dists.begin() + k - 1, dists.end());
+        kDistances.push_back(dists[k - 1]);
+    }
+
+    std::sort(kDistances.begin(), kDistances.end());
+    size_t pos = static_cast<size_t>(percentile * kDistances.size());
+    if (pos >= kDistances.size()) pos = kDistances.size() - 1;
+    return kDistances[pos];
+}
+
+static void normalizeFeatures(std::vector<std::vector<float>>& points) {
+    if (points.empty() || points[0].empty()) return;
+    size_t nFeatures = points[0].size();
+    size_t nPoints = points.size();
+    TLoading* load = new TLoading(Application->MainForm);
+	load->setDuration(nFeatures);
+	load->Show();
+    for (size_t f = 0; f < nFeatures; ++f) {
+        double mean = 0.0;
+        for (size_t i = 0; i < nPoints; ++i) mean += points[i][f];
+        mean /= nPoints;
+
+        double variance = 0.0;
+        for (size_t i = 0; i < nPoints; ++i) {
+            double diff = points[i][f] - mean;
+            variance += diff * diff;
+        }
+        double stddev = std::sqrt(variance / nPoints);
+        if (stddev < 1e-9) stddev = 1.0; // избегаем деления на ноль
+
+        for (size_t i = 0; i < nPoints; ++i) {
+            points[i][f] = (points[i][f] - mean) / stddev;
+        }
+        load->update(1);
+    }
+}
+
+
+static void hsvToRgb(float h, float s, float v, float& r, float& g, float& b) {
+    h = std::fmod(h, 360.0f);
+    if (h < 0) h += 360.0f;
+    int hi = static_cast<int>(h / 60.0f) % 6;
+    float f = h / 60.0f - hi;
+    float p = v * (1.0f - s);
+    float q = v * (1.0f - f * s);
+    float t = v * (1.0f - (1.0f - f) * s);
+    switch (hi) {
+        case 0: r = v; g = t; b = p; break;
+        case 1: r = q; g = v; b = p; break;
+        case 2: r = p; g = v; b = t; break;
+        case 3: r = p; g = q; b = v; break;
+        case 4: r = t; g = p; b = v; break;
+        default: r = v; g = p; b = q; break;
+    }
+}
+
+static std::vector<int> dbscan(const std::vector<std::vector<float>>& points,
+                               float eps, int minPts) {
+    const int n = points.size();
+    if (n == 0) return {};
+
+    // Построение KD-дерева
+    std::vector<PointV> pointList(n);
+    for (int i = 0; i < n; ++i) {
+        pointList[i] = {points[i], i};
+    }
+    KDNode* root = buildKDTree(pointList);
+
+    std::vector<int> labels(n, -2);
+    int clusterId = 0;
+
+    for (int i = 0; i < n; ++i) {
+        if (labels[i] != -2) continue;
+
+        // Поиск соседей через KD-дерево
+        std::vector<int> neighbors = findNeighbors(root, points[i], i, eps);
+
+        if (neighbors.size() < static_cast<size_t>(minPts)) {
+            labels[i] = -1;
+            continue;
+        }
+
+        labels[i] = clusterId;
+        std::queue<int> queue;
+        for (int nb : neighbors) queue.push(nb);
+
+        while (!queue.empty()) {
+            int curr = queue.front(); queue.pop();
+            if (labels[curr] == -1) labels[curr] = clusterId;
+            if (labels[curr] != -2) continue;
+            labels[curr] = clusterId;
+
+            std::vector<int> currNeighbors = findNeighbors(root, points[curr], curr, eps);
+            if (currNeighbors.size() >= static_cast<size_t>(minPts)) {
+                for (int nb : currNeighbors) {
+                    if (labels[nb] == -2 || labels[nb] == -1)
+                        queue.push(nb);
+                }
+            }
+        }
+        ++clusterId;
+    }
+
+    delete root;
+    return labels;
+}
 
 std::shared_ptr<IBaseData> DataCalculator::smoothT(const std::shared_ptr<IBaseData>& input, int window){
 	if (window <= 1) {
@@ -463,4 +813,216 @@ std::shared_ptr<SeismicData> DataCalculator::filter(const std::shared_ptr<Seismi
 		return std::move(ret);
 }
 
+std::shared_ptr<RgbData> DataCalculator::Cluster(const std::shared_ptr<RgbData>& input, int minPts) {
+    if (!input) return nullptr;
 
+    // 1. Извлечение размеров и данных
+    const auto& rawData = input->getRawData();
+    size_t filters = rawData.size();
+    if (filters == 0) return nullptr;
+    size_t traces = rawData[0].size();
+    if (traces == 0) return nullptr;
+    size_t samples = rawData[0][0].size();
+    if (samples == 0) return nullptr;
+
+    const size_t totalPoints = traces * samples;
+
+    // 2. Преобразование в список точек: каждая точка – вектор признаков длины filters
+    //    Порядок обхода: сначала все отсчёты для первой трассы, затем для второй и т.д.
+    std::vector<std::vector<float>> points(totalPoints, std::vector<float>(filters));
+    for (size_t trace = 0; trace < traces; ++trace) {
+        for (size_t sample = 0; sample < samples; ++sample) {
+            size_t idx = trace * samples + sample;
+            for (size_t f = 0; f < filters; ++f) {
+                points[idx][f] = rawData[f][trace][sample];
+            }
+        }
+    }
+
+    // 3. Нормализация признаков (Z-score)
+//    normalizeFeatures(points);
+    preprocessForPearson(points);
+    // 4. Параметры DBSCAN – требуют настройки под ваши данные
+//    int minPts = 20;        // минимальное число точек в кластере
+
+    // Диагностика (временно)
+    {
+        float avgNorm = 0.0f;
+        int zeroNormCount = 0;
+        for (auto& p : points) {
+            float norm = std::sqrt(std::inner_product(p.begin(), p.end(), p.begin(), 0.0f));
+            avgNorm += norm;
+            if (norm < 1e-6f) zeroNormCount++;
+        }
+        avgNorm /= points.size();
+        ShowMessage("Средняя норма: " + String(avgNorm) + ", нулевых: " + String(zeroNormCount));
+
+        int sampleN = std::min(100, (int)points.size());
+        float avgDist = 0.0f;
+        int pc = 0;
+        for (int i = 0; i < sampleN; ++i)
+            for (int j = i+1; j < sampleN; ++j) {
+                avgDist += euclideanDistance(points[i], points[j]);
+                pc++;
+            }
+        avgDist /= pc;
+        ShowMessage("Среднее расстояние (выборка): " + String(avgDist));
+    }
+
+    float eps = estimateEps(points, minPts, 0.9);      // радиус окрестности (после нормализации)
+    ShowMessage(eps);
+
+
+    // 5. Запуск DBSCAN
+    std::vector<int> labels = dbscan(points, eps, minPts);
+
+    // 6. Определение количества кластеров (исключая шум)
+    int maxCluster = -1;
+    for (int lbl : labels) {
+        if (lbl > maxCluster) maxCluster = lbl;
+    }
+    int numClusters = maxCluster + 1; // если нет кластеров, то 0
+    ShowMessage(numClusters);
+    // 7. Построение палитры цветов (HSV -> RGB) для каждого кластера
+    std::vector<std::tuple<float, float, float>> clusterColors(numClusters);
+    for (int c = 0; c < numClusters; ++c) {
+        float hue = (static_cast<float>(c) / numClusters) * 360.0f;
+        float r, g, b;
+        hsvToRgb(hue, 1.0f, 1.0f, r, g, b);
+        clusterColors[c] = {r, g, b};
+    }
+    // Цвет шума (метка -1) – чёрный
+    std::tuple<float, float, float> noiseColor = {0.0f, 0.0f, 0.0f};
+
+    // 8. Формирование выходного RGB-куба (traces x samples x 3)
+    std::vector<std::vector<std::vector<float>>> rgbData(
+        3, std::vector<std::vector<float>>(traces, std::vector<float>(samples, 0.0f)));
+
+    for (size_t trace = 0; trace < traces; ++trace) {
+        for (size_t sample = 0; sample < samples; ++sample) {
+            size_t idx = trace * samples + sample;
+            int label = labels[idx];
+            float r, g, b;
+            if (label == -1) {
+                std::tie(r, g, b) = noiseColor;
+            } else {
+                std::tie(r, g, b) = clusterColors[label];
+            }
+            rgbData[0][trace][sample] = r;  // R-слой
+            rgbData[1][trace][sample] = g;  // G-слой
+            rgbData[2][trace][sample] = b;  // B-слой
+        }
+    }
+
+    // 9. Создание и возврат нового RgbData
+    std::shared_ptr<RgbData> result = std::make_shared<RgbData>(
+        rgbData,                     // RGB-данные
+        input->getDT(),              // тот же шаг дискретизации
+        1.0f, 100.0f,                 // границы частот (не используются для RGB)
+        "Clusters",                 // имя
+        "DBSCAN clustering (eps=" + std::to_string(eps) + ", minPts=" + std::to_string(minPts) + ")"
+    );
+    return result;
+}
+std::shared_ptr<RgbData> DataCalculator::DominantFrequencyDirection(const std::shared_ptr<RgbData>& input) {
+    if (!input) return nullptr;
+
+    auto freqField = computeDominantFreqField(input);
+    auto gradT = gradientT(freqField);
+    auto gradX = gradientX(freqField);
+
+    size_t nTraces = freqField.size();
+    size_t nSamples = freqField[0].size();
+
+    std::vector<std::vector<std::vector<float>>> rgbData(
+        3, std::vector<std::vector<float>>(nTraces, std::vector<float>(nSamples, 0.0f)));
+
+    for (size_t tr = 0; tr < nTraces; ++tr) {
+        for (size_t sm = 0; sm < nSamples; ++sm) {
+            float gx = gradX[tr][sm];
+            float gt = gradT[tr][sm];
+            float angle = std::atan2(gt, gx); // [-π, π]
+            // Преобразуем в hue [0,360)
+            float hue = (angle + M_PI) * 180.0f / M_PI;
+            float r, g, b;
+            hsvToRgb(hue, 1.0f, 1.0f, r, g, b);
+            rgbData[0][tr][sm] = r;
+            rgbData[1][tr][sm] = g;
+            rgbData[2][tr][sm] = b;
+        }
+    }
+
+    return std::make_shared<RgbData>(rgbData, input->getDT(), 0.0f, 1.0f,
+                                     input->getName() + "_dir",
+                                     input->getProcedures() + "_gradDir");
+}
+std::shared_ptr<RgbData> DataCalculator::ClusterDirectionField(const std::shared_ptr<RgbData>& input,
+                                                               int minPts, float epsDir) {
+    if (!input) return nullptr;
+
+    auto freqField = computeDominantFreqField(input);
+    auto gradT = gradientT(freqField);
+    auto gradX = gradientX(freqField);
+
+    size_t nTraces = freqField.size();
+    size_t nSamples = freqField[0].size();
+    size_t nPoints = nTraces * nSamples;
+
+    // Собираем точки: нормализованные векторы направления
+    std::vector<std::vector<float>> points(nPoints, std::vector<float>(2, 0.0f));
+    for (size_t tr = 0; tr < nTraces; ++tr) {
+        for (size_t sm = 0; sm < nSamples; ++sm) {
+            size_t idx = tr * nSamples + sm;
+            float gx = gradX[tr][sm];
+            float gt = gradT[tr][sm];
+            float len = std::sqrt(gx*gx + gt*gt);
+            if (len > 1e-6f) {
+                points[idx][0] = gx / len;
+                points[idx][1] = gt / len;
+            } else {
+                points[idx][0] = points[idx][1] = 0.0f;
+            }
+        }
+    }
+
+    // Вызываем DBSCAN (евклидово расстояние на плоскости)
+    std::vector<int> labels = dbscan(points, epsDir, minPts);
+
+    // Подсчёт кластеров
+    int maxCluster = -1;
+    for (int lbl : labels) if (lbl > maxCluster) maxCluster = lbl;
+    int numClusters = maxCluster + 1;
+
+    // Палитра
+    std::vector<std::tuple<float,float,float>> clusterColors(numClusters);
+    for (int c = 0; c < numClusters; ++c) {
+        float hue = (c * 360.0f) / numClusters;
+        float r,g,b;
+        hsvToRgb(hue, 1.0f, 1.0f, r, g, b);
+        clusterColors[c] = {r,g,b};
+    }
+    auto noiseColor = std::make_tuple(0.0f, 0.0f, 0.0f);
+
+    // Формирование RGB вывода
+    std::vector<std::vector<std::vector<float>>> rgbData(
+        3, std::vector<std::vector<float>>(nTraces, std::vector<float>(nSamples, 0.0f)));
+
+    for (size_t tr = 0; tr < nTraces; ++tr) {
+        for (size_t sm = 0; sm < nSamples; ++sm) {
+            size_t idx = tr * nSamples + sm;
+            int label = labels[idx];
+            float r,g,b;
+            if (label == -1) {
+                std::tie(r,g,b) = noiseColor;
+            } else {
+                std::tie(r,g,b) = clusterColors[label];
+            }
+            rgbData[0][tr][sm] = r;
+            rgbData[1][tr][sm] = g;
+            rgbData[2][tr][sm] = b;
+        }
+    }
+
+    std::string proc = input->getProcedures() + "_clusterDir(eps=" + std::to_string(epsDir) + ",minPts=" + std::to_string(minPts) + ")";
+    return std::make_shared<RgbData>(rgbData, input->getDT(), 0.0f, 1.0f, input->getName() + "_clusters", proc);
+}

@@ -9,6 +9,7 @@
 Traces readInlineRegular(std::wstring fName, int l);
 Traces readIBM(std::wstring fName);
 //--
+Traces readXlineRegular(std::wstring fName, int l);
 Traces readTimeSliceRegular(std::wstring fName, int timeSample);
 //--
 Traces readCrosslineRegular(std::wstring fName, int crosslineNumber);
@@ -31,4 +32,8 @@ size4 readSizeRGB(std::wstring fName, std::vector<float>& freqOut);
 std::shared_ptr<RgbData> readCrosslineRGB(std::wstring fName, int trace);
 std::shared_ptr<RgbData> readInlineRGB(std::wstring fName, int line);
 std::shared_ptr<RgbData> readTimeSliceRGB(std::wstring fileName, int timeSample);
+
+void calculateCube(std::wstring fName, int nf, int fn, int fk, int filterWidth);
+void convertToSliceOrder(const std::wstring& inputFileName);
+void convertCube(const std::wstring& inputFileName);
 #endif

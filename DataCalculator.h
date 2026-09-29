@@ -23,6 +23,9 @@ class DataCalculator
 
 	static std::shared_ptr<IBaseData> mute(const std::shared_ptr<IBaseData>& input, int start, int stop);
 	static std::shared_ptr<RgbData> SwanToRGB(const std::shared_ptr<SeismicData>& input, int window = 1);
+    static std::shared_ptr<RgbData> Cluster(const std::shared_ptr<RgbData>& input, int minPoints);
+    static std::shared_ptr<RgbData> DominantFrequencyDirection(const std::shared_ptr<RgbData>& input);
+    static std::shared_ptr<RgbData> ClusterDirectionField(const std::shared_ptr<RgbData>& input, int minPts, float epsDir = 0.2f);
 	//static RgbData getRGB(SeismicData input, const float freqStart, const float freqFinish, const int filtersNumber, const int filterWidth);
 };
 #endif

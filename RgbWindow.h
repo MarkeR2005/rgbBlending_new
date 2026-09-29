@@ -24,6 +24,8 @@ class RgbWindow : public FlatWindow, public IRgbWindow
 	//--
 	void renderWindow() override;
 
+    void renderForScreenshot() override;
+
 	//--
 	bool inverse = false;
 	//--
@@ -35,7 +37,7 @@ class RgbWindow : public FlatWindow, public IRgbWindow
 	private:
 	int R = 0, G = 0, B = 0;
 	//--
-	bool isR = true, isG = false, isB = false;
+	bool isR = true, isG = true, isB = true;
 
 	GLuint indexTexture = 0;
 	//

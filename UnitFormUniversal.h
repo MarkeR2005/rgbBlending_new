@@ -52,6 +52,11 @@ __published:	// IDE-managed Components
 	TMenuItem *ControlPanel;
 	TMenuItem *LeftAxe;
 	TMenuItem *TopAxe;
+	TMenuItem *Changepalette1;
+	TMenuItem *Changeshader1;
+	TMenuItem *SetRatio1;
+	TMenuItem *SaveScreenShot1;
+	TMenuItem *RightAxe;
 	void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
 	void __fastcall OpenAsClick(TObject *Sender);
 	void __fastcall ScrollBar1Change(TObject *Sender);
@@ -64,6 +69,11 @@ __published:	// IDE-managed Components
 	void __fastcall ScrollBarRChange(TObject *Sender);
 	void __fastcall LeftAxeClick(TObject *Sender);
 	void __fastcall TopAxeClick(TObject *Sender);
+	void __fastcall Changepalette1Click(TObject *Sender);
+	void __fastcall Changeshader1Click(TObject *Sender);
+	void __fastcall SetRatio1Click(TObject *Sender);
+	void __fastcall SaveScreenShot1Click(TObject *Sender);
+	void __fastcall RightAxeClick(TObject *Sender);
 private:	// User declarations
     System::UnicodeString path = "";
 public:		// User declarations
@@ -80,8 +90,22 @@ public:		// User declarations
 		ScrollBarG->Max = std::max(fr_size-1, 0);
 		ScrollBarB->Max = std::max(fr_size-1, 0);
 	}
+    void __fastcall initForCube(System::UnicodeString path){
+    windowContainer->initialize();
+    windowContainer->setFile(path.c_str());
+    int fr_size = windowContainer->getFreqSize();
+		if (fr_size < 0) {
+			throw "Bad data";
+		}
+		ScrollBarR->Max = std::max(fr_size-1, 0);
+		ScrollBarG->Max = std::max(fr_size-1, 0);
+		ScrollBarB->Max = std::max(fr_size-1, 0);
+    };
     void setTraceCallback(std::function<void(int)> callback){
         windowContainer->setTraceCallback(callback);
+    }
+    void setDisplayCallback(std::function<void(int, int)> callback){
+        windowContainer->setDisplayCallback(callback);
     }
 };
 //---------------------------------------------------------------------------

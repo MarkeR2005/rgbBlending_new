@@ -10,31 +10,18 @@
 #include "RgbData.h"
 #include "Structures.h"
 #include "UnitFormUniversal.h"
+#include "ChooseForm.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
-
+void init(){
+ShowMessage("Init");
+return;
+}
 SeismicData* readDataIBM(std::wstring filePath){
 	try {
 		Traces tr = readIBM(filePath);
 		SeismicData* sd = new SeismicData(tr.data, tr.dt, tr.samplesNumber, tr.tracesNumber);
 		return sd;
-	} catch (...) {
-		throw "RGBBlending: FILE ERROR";
-	}
-}
-//Reads data from internal formats
-RgbData* readDataInternalFormat(std::wstring filePath, bool isRgb){
-	try {
-		if (isRgb) {
-			RgbData tmp = RgbData::loadFile(filePath);
-			RgbData* rd = &tmp;
-			return rd;
-		}
-//		else {
-//			SeismicData tmp = SeismicData::loadFile(filePath);
-//			SeismicData* sd = &tmp;
-//			return sd;
-//        }
 	} catch (...) {
 		throw "RGBBlending: FILE ERROR";
 	}
@@ -69,46 +56,106 @@ SeismicData* readDataIBMCube(std::wstring filePath, int type, int pos){
 int getMaxTraceS(SeismicData* data){
 return data->getSize().x;
 }
-int getMaxTraceR(RgbData* data){
-return data->getSize().x;
-}
 
-TFormUniversal* CreateRgbBlendingFormSD(SeismicData* data, System::UnicodeString path, std::function<void(int)> callback){
+TForm* CreateRgbBlendingForm(System::UnicodeString path, std::function<void(int)> callback, std::function<void(int, int)> callbackDisplay){
 	try {
-
-		TFormUniversal* form = new TFormUniversal(Application->MainForm, path);
-        form->setTraceCallback(callback);
-        TAbstractDialog* dialog = new TAbstractDialog(nullptr);
-		dialog->AddInput<float>("Начальная частота", stnFreqStart);
-		dialog->AddInput<float>("Конечная частота", stnFreqStop);
-		dialog->AddInput<int>("Число фильтров", stnNumFilters);
-		dialog->AddInput<int>("Ширина фильтра", stnFilterWindow);
-		dialog->AddInput<int>("Ширина окна сглаживания", stnTWindow);
-		if (dialog->Execute() && dialog->ContinuePressed) {
-			std::shared_ptr<IBaseData> newData = std::make_shared<RgbData>(data, stnFreqStart, stnFreqStop, stnNumFilters, stnFilterWindow);
-			newData = DataCalculator::smoothT(newData, stnTWindow);
-			form -> initFromData(newData);
-		}
-		else {
-			form -> initFromData(std::make_shared<SeismicData>(*data));
-		}
-		delete dialog;
-		return form;
+		TChoose* choose = new TChoose(Application->MainForm);
+		choose->SetRGBPath(path);
+        if (choose->Execute() && choose->execType!=0){
+            TFormUniversal* form = new TFormUniversal(Application->MainForm, path);
+			form->setTraceCallback(callback);
+            form->setDisplayCallback(callbackDisplay);
+            switch (choose->execType) {
+            case 1:
+            	{
+                Traces tr = readIBM((path+".ibm").c_str());
+				std::shared_ptr<SeismicData> sd = std::make_shared<SeismicData>(tr.data, tr.dt, tr.samplesNumber, tr.tracesNumber);
+                form -> initFromData(sd);
+                break;
+                }
+            case 2:
+            	{
+            	TAbstractDialog* dialog = new TAbstractDialog(nullptr);
+                dialog->AddInput<float>("Начальная частота", stnFreqStart);
+                dialog->AddInput<float>("Конечная частота", stnFreqStop);
+                dialog->AddInput<int>("Число фильтров", stnNumFilters);
+                dialog->AddInput<int>("Ширина фильтра", stnFilterWindow);
+                dialog->AddInput<int>("Ширина окна сглаживания", stnTWindow);
+                if (dialog->Execute() && dialog->ContinuePressed) {
+                    Traces tr = readIBM((path+".ibm").c_str());
+					std::shared_ptr<SeismicData> sd = std::make_shared<SeismicData>(tr.data, tr.dt, tr.samplesNumber, tr.tracesNumber);
+                    std::shared_ptr<IBaseData> newData = std::make_shared<RgbData>(sd.get(), stnFreqStart, stnFreqStop, stnNumFilters, stnFilterWindow);
+                    newData = DataCalculator::smoothT(newData, stnTWindow);
+                    form -> initFromData(newData);
+                }
+                delete dialog;
+                break;
+                }
+            case 3:
+                {
+                std::shared_ptr<IBaseData> newData = std::make_shared<RgbData>(RgbData::loadFile(choose->getChosen().c_str()));
+                form -> initFromData(newData);
+                break;
+                }
+            default:
+                ;
+            }
+            choose->Free();
+            return form;
+        };
+        choose->Free();
+        return nullptr;
 
 	} catch (...) {
 		throw "RGBBlending: UNKNOWN DATA ERROR";
 	}
 }
-TFormUniversal* CreateRgbBlendingFormRGB(RgbData* data, System::UnicodeString path, std::function<void(int)> callback){
+
+TForm* CreateRgbBlendingFormCube(System::UnicodeString path){
 	try {
-		TFormUniversal* form = new TFormUniversal(Application->MainForm, path);
-        form->setTraceCallback(callback);
-		form -> initFromData(std::make_shared<RgbData>(*data));
-		return form;
+		TChoose* choose = new TChoose(Application->MainForm);
+		choose->SetRGBPath(path);
+        if (choose->Execute() && choose->execType!=0){
+            TFormUniversal* form = new TFormUniversal(Application->MainForm, path);
+            switch (choose->execType) {
+            case 1:
+                {
+                form -> initForCube(path+L".ibm");
+                break;
+                }
+            case 2:
+            	{
+            	TAbstractDialog* dialog = new TAbstractDialog(nullptr);
+                dialog->AddInput<float>("Начальная частота", stnFreqStart);
+                dialog->AddInput<float>("Конечная частота", stnFreqStop);
+                dialog->AddInput<int>("Число фильтров", stnNumFilters);
+                dialog->AddInput<int>("Ширина фильтра", stnFilterWindow);
+                if (dialog->Execute() && dialog->ContinuePressed) {
+                    calculateCube(path.c_str(), stnNumFilters, stnFreqStart, stnFreqStop, stnFilterWindow);
+                }
+                break;
+                }
+            case 3:
+                {
+                if(MessageDlg("Вы хотите конвертировать файл в slice-cube?",
+                   mtConfirmation,          // Тип: вопрос, предупреждение, ошибка...
+                   TMsgDlgButtons() << mbYes << mbNo, // Кнопки: Да и Нет
+                   0) == mrYes) {
+                        convertToSliceOrder((path+L"\\"+ExtractFileName(choose->getChosen())).c_str());
+                   }
+                form -> initForCube(choose->getChosen());
+                break;
+                }
+            default:
+                ;
+            }
+            return form;
+        };
+        choose->Free();
+
+        return nullptr;
+
 	} catch (...) {
 		throw "RGBBlending: UNKNOWN DATA ERROR";
 	}
-}
-void ShowForm(TFormUniversal* form){
-form -> Show();
 }

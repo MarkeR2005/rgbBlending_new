@@ -116,8 +116,8 @@ public:
 	std::shared_ptr<AbstractPlane> getSelectedPlane() override { return m_selectedPlane; }
 
 
-	void setChannels(int red, int green, int blue);
-    void setChannelEnabled(bool red, bool green, bool blue);
+	void setChannels(int red, int green, int blue) override;
+    void setChannelEnabled(bool red, bool green, bool blue) override;
 
     // Колбэки
     void setPlaneSelectionCallback(std::function<void(std::shared_ptr<AbstractPlane>)> callback) {

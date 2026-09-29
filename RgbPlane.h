@@ -7,6 +7,7 @@
 #include "AbstractPlane.h"
 #include <vector>
 #include <array>
+#include "RgbData.h"
 
 class RgbPlane : public AbstractPlane {
 private:
@@ -33,14 +34,16 @@ private:
     int m_layerCount;
 
     void setupShader() override;
-
+	std::function<std::shared_ptr<RgbData>()> ret_func = [](){return std::make_shared<RgbData>();};
 public:
-    RgbPlane(const glm::vec3& anchor, const glm::vec3& normal,
-             const glm::vec2& size, GLuint shaderProgram, bool flipV = false, bool flipH = false);
+	RgbPlane(const glm::vec3& anchor, const glm::vec3& normal,
+			 const glm::vec2& size, GLuint shaderProgram, std::function<std::shared_ptr<RgbData>()> ret, bool flipV = false, bool flipH = false);
     ~RgbPlane();
 
     void render(const glm::mat4& view, const glm::mat4& projection) override;
-
+	std::shared_ptr<IBaseData> getData() override {
+        return ret_func();
+    }
     // Управление текстурами
 	void initTextureArray(const std::vector<bitMap>& textureData);
     void updateTextureLayer(int layer, const std::vector<uint8_t>& data);

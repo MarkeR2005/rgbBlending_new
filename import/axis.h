@@ -50,7 +50,7 @@ TAxeParameters() {
     showMinorTicks=true;
     automatic=true; //0,1,2.  2-means narrow labels for HORZ axe
     picksColor=clBlack;
-    backColor=clWhite;
+    backColor=clInfoBk;
     majorPicksWidth=1;
 }
 ~TAxeParameters() {delete axeFont;}

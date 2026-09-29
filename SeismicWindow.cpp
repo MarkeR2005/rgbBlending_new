@@ -98,5 +98,27 @@ void SeismicWindow::renderWindow()
 	//glUniform1i(glGetUniformLocation(shaderProgram, "selectedTrace"), selectedTrace);
 	//Очистка буфферов
 	FlatWindow::postRender();
+    glfwSwapBuffers(handle);
+}
+
+void SeismicWindow::renderForScreenshot()
+{
+	//Проверка инициализции
+	if (!handle) return;
+	//Очистка
+	FlatWindow::preRender();
+	//Родительский рендер
+	FlatWindow::render();
+	//Собственный рендер
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, indexTexture);
+	glUniform1i(glGetUniformLocation(shaderProgram, "indexTexture"), 0);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture((GL_TEXTURE_1D), paletteTexture);
+	glUniform1i(glGetUniformLocation(shaderProgram, "paletteTexture"), 1);
+	//glUniform1i(glGetUniformLocation(shaderProgram, "selectedTrace"), selectedTrace);
+	//Очистка буфферов
+	FlatWindow::postRender();
+    glFlush();
 }
 
