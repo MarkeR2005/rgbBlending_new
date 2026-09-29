@@ -4,6 +4,7 @@
 #include "InterfacesData.h"
 #include "axis.h"
 #include "Shaders.h"
+#include "Structures.h"
 
 #ifndef WindowContainerH
 #define WindowContainerH
@@ -38,6 +39,8 @@ private:
 	TAxis2* axisY = new TAxis2(false);
     TAxis2* axisYR = new TAxis2(false);
 	TPanel* viewPanel;
+    TButton* updateHorizonsButton = nullptr;
+    std::function<void(const std::vector<Horizon>&)> horizonsCallback;
 
 	int posx_ = 0;
 	int posy_ = 0;
@@ -59,6 +62,7 @@ protected:
 	std::wstring fileName;
 
 	void __fastcall Resize(TObject* Sender);
+    void __fastcall UpdateHorizonsClick(TObject* Sender);
 	virtual void __fastcall Loaded();
 
 	void setupCallbacks();
@@ -72,6 +76,9 @@ protected:
 public:
     void setTraceCallback(std::function<void(int)> callback_){callback = callback_;};
     void setDisplayCallback(std::function<void(int, int)> callback_){callbackDisp = callback_;};
+    void setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb){horizonsCallback = std::move(cb);}
+    bool setHorizons(const std::vector<Horizon>& value);
+    bool setCrosses(const std::vector<Cross>& value);
 	static std::vector<TWindowContainer*> instances_;
 	int getFreqSize();
     float getFreqByIndex(int idx);

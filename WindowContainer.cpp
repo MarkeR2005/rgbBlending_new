@@ -30,6 +30,13 @@ __fastcall TWindowContainer::TWindowContainer(TComponent* Owner) : TPanel(Owner)
 	viewPanel = new TPanel(this);
 	viewPanel->Parent = this;
 	viewPanel->Align = alClient;
+    updateHorizonsButton = new TButton(this);
+    updateHorizonsButton->Parent = this;
+    updateHorizonsButton->Align = alTop;
+    updateHorizonsButton->Height = 28;
+    updateHorizonsButton->Caption = L"Обновить горизонты";
+    updateHorizonsButton->OnClick = UpdateHorizonsClick;
+    updateHorizonsButton->Visible = false;
 
 	image1 = new TImage(this);
 	image1->Height = 1440;
@@ -148,6 +155,25 @@ void TWindowContainer::changeShader(GLuint shaderProgram){
         flatWin->setShaderProgram(shaderProgram);
     }
 }
+bool TWindowContainer::setHorizons(const std::vector<Horizon>& value) {
+    FlatWindow* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat) return false;
+    flat->setHorizons(value);
+    return true;
+}
+bool TWindowContainer::setCrosses(const std::vector<Cross>& value) {
+    FlatWindow* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat) return false;
+    flat->setCrosses(value);
+    return true;
+}
+void __fastcall TWindowContainer::UpdateHorizonsClick(TObject*) {
+    FlatWindow* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (flat && horizonsCallback) {
+        const auto snapshot = flat->getHorizons();
+        horizonsCallback(snapshot);
+    }
+}
 void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
 	if (!data->getCM()) {
 		data->setCM(colorManager);
@@ -175,7 +201,7 @@ void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
 		}
 		window_->initWindow(viewPanel);
 //        std::this_thread::sleep_for(std::chrono::seconds(1));
-		window_->initTexture(rData->getTexture());
+		window_->initData(rData);
         window_->setDT(rData->getDT()/1000.0f);
         type = WindowType::RGB;
 		window = std::move(window_);
@@ -192,9 +218,10 @@ void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
     image4 ->Visible = true;
     image4 ->Enabled = true;
 	dataContainer = data;
-	setupCallbacks();
+    updateHorizonsButton->Visible = true;
+    setupCallbacks();
 	setupButtons();
-	window->resizeWindow(this->Width-50*((image1->Visible ? 1 : 0)+(image3->Visible ? 1 : 0)),this->Height-50*((image2->Visible ? 1 : 0) + (image4->Visible ? 1 : 0)));
+	window->resizeWindow(viewPanel->Width, viewPanel->Height);
 	updateAxis(true);
 	NameInfo->Caption = data->getName().c_str();
 }
@@ -215,6 +242,7 @@ void TWindowContainer::initialize(){
 	window_->setPerspective(45.0f, 0.1f, 10000.0f);
 	window = std::move(window_);
 	type = WindowType::VOL;
+    updateHorizonsButton->Visible = false;
 	syncButton->Enabled=false;
     syncButton->Visible=false;
 	setupCallbacks();
@@ -286,7 +314,7 @@ void __fastcall TWindowContainer::Resize(TObject* Sender){
 	if (!window) {
 		return;
     }
-	window->resizeWindow(this->Width-50*(image1->Visible ? 1 : 0),this->Height-50*(image2->Visible ? 1 : 0));
+	window->resizeWindow(viewPanel->Width, viewPanel->Height);
 	updateAxis(true);
 }
 void TWindowContainer::setViewParams(viewParams params){
@@ -432,6 +460,16 @@ void TWindowContainer::createWindow(const std::shared_ptr<IBaseData>& newData, i
 }
 
 void TWindowContainer::setupFlatButtons(){
+    addButton("Edit horizon (draw with mouse)", [this]() {
+        auto* flat = dynamic_cast<FlatWindow*>(window.get());
+        if (!flat) return;
+        if (flat->horizonEditing()) {flat->setHorizonEditing(false); return;}
+        int number = 0;
+        std::unique_ptr<TAbstractDialog> dialog(new TAbstractDialog(nullptr));
+        dialog->AddInput<int>("Номер горизонта", number);
+        if (dialog->Execute() && dialog->ContinuePressed && number >= 0)
+            flat->selectHorizon(static_cast<size_t>(number));
+    });
 	addButton("Smooth T", [&](){
 		TAbstractDialog* dialog = new TAbstractDialog(nullptr);
 		dialog->AddInput<int>("Окно (отсчётов)", stnTWindow);

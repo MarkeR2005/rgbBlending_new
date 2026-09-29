@@ -31,6 +31,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	virtual void render();
 	virtual void renderHighlights();
 	virtual void renderHorizons();
+    virtual void renderCrosses();
 	virtual void postRender();
 
 	virtual void renderWindow() override;
@@ -43,7 +44,15 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	float getZoom() override {return zoom;};
 	void getSize(int& w, int& h) override {w = width;h = height;};
 	GLFWwindow* getWindow() override;
-	std::vector<float> getHorizon() override {return horizon;};
+	std::vector<float> getHorizon() override;
+    const std::vector<Horizon>& getHorizons() const {return horizons;}
+    void setHorizons(const std::vector<Horizon>& value);
+    void setCrosses(const std::vector<Cross>& value);
+    void setHorizonsVisible(bool value) {showHorizons = value; renderWindow();}
+    void setCrossesVisible(bool value) {showCrosses = value; renderWindow();}
+    void setHorizonEditing(bool value) {isDrawing = value; firstPoint = true;}
+    bool horizonEditing() const {return isDrawing;}
+    void selectHorizon(size_t index);
 	float getDT() override {return dT;};
 	//Setters
 	virtual void setOffset(float ox, float oy) override {offsetX = ox;offsetY = oy;};
@@ -104,7 +113,15 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 
 
 	private:
-	int horNum = 0;
+	size_t horNum = 0;
+    bool showHorizons = true, showCrosses = true;
+    std::vector<Horizon> horizons;
+    std::vector<Cross> crosses;
+    struct CrossLabel { GLuint texture; int width; int height; };
+    std::vector<CrossLabel> crossLabels;
+    GLuint labelProgram = 0, labelVAO = 0, labelVBO = 0;
+    void clearCrossLabels();
+    void renderCrossLabels();
 	std::vector<point2> highlighted_points = {};
 	//static std::vector<FlatWindow*> instances_;
 
@@ -135,11 +152,8 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	//--
 	GLuint highlightProgram = 0, horizonProgram = 0;
 
-	std::vector<float> horizon = {};
 	void clampOffsets();
 	// Обновление одной точки
-	 void updateGPUData();
-	 void updateGPUPoint(int indexL, int indexR);
 	 void addPoint(float x1, float y1);
 	 void interpolateBetweenPoints(float x1, float y1, float x2, float y2);
 };

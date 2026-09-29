@@ -101,8 +101,13 @@ public:		// User declarations
 		ScrollBarG->Max = std::max(fr_size-1, 0);
 		ScrollBarB->Max = std::max(fr_size-1, 0);
     };
+    bool setHorizons(const std::vector<Horizon>& value){return windowContainer->setHorizons(value);}
+    bool setCrosses(const std::vector<Cross>& value){return windowContainer->setCrosses(value);}
+    void setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb){
+        windowContainer->setHorizonsCallback(std::move(cb));
+    }
     void setTraceCallback(std::function<void(int)> callback){
-        windowContainer->setTraceCallback(callback);
+        windowContainer->setTraceCallback(std::move(callback));
     }
     void setDisplayCallback(std::function<void(int, int)> callback){
         windowContainer->setDisplayCallback(callback);

@@ -3,6 +3,7 @@
 #ifndef StructuresH
 #define StructuresH
 #include <vector>
+#include <string>
 //---------------------------------------------------------------------------
 static float stnFreqStart = 5;
 static float stnFreqStop = 100;
@@ -12,6 +13,15 @@ static int stnXWindow = 5;
 static int stnTWindow = 5;
 static int stnFWindow = 5;
 static float stnFilterFreq = 15;
+// One ordinate per trace; negative values mean no picked point.
+struct Horizon {
+    std::wstring name;
+    std::vector<float> points;
+};
+struct Cross {
+    std::wstring name;
+    int x = 0; // trace coordinate
+};
 struct bitMap
 {
 	std::vector<uint8_t> texture;

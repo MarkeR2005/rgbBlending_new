@@ -3,6 +3,8 @@
 #include "BaseWindow.h"
 #include "Shaders.h"
 #include <algorithm>
+#include <cmath>
+#include <memory>
 #include <vcl.h>
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -72,6 +74,7 @@ void FlatWindow::initWindow(TPanel* parent)
 
 	highlightProgram = createShaderProgram("universal", "highlight");
 	horizonProgram = createShaderProgram("test", "horizon");
+    labelProgram = createShaderProgram("cross_label", "cross_label");
 
 	//For horizons
 	glGenVertexArrays(1, &VAO1);
@@ -83,8 +86,23 @@ void FlatWindow::initWindow(TPanel* parent)
 	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 	glBindVertexArray(0);
+    glGenVertexArrays(1, &labelVAO);
+    glGenBuffers(1, &labelVBO);
+    glBindVertexArray(labelVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, labelVBO);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), (void*)(2*sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glBindVertexArray(0);
 
-	glfwSetWindowUserPointer(handle, this);
+    glfwSetKeyCallback(handle, [](GLFWwindow* win, int key, int, int action, int mods) {
+        auto* fw = static_cast<FlatWindow*>(glfwGetWindowUserPointer(win));
+        if (!fw || action != GLFW_PRESS || (mods & (GLFW_MOD_CONTROL | GLFW_MOD_ALT | GLFW_MOD_SUPER))) return;
+        if (key == GLFW_KEY_H) fw->setHorizonsVisible(!fw->showHorizons);
+        if (key == GLFW_KEY_C) fw->setCrossesVisible(!fw->showCrosses);
+    });
+    glfwSetWindowUserPointer(handle, this);
 
 	glfwSetMouseButtonCallback(handle, [](GLFWwindow* win, int button, int action, int mods)
 	{
@@ -165,7 +183,11 @@ FlatWindow::~FlatWindow(){
 		glDeleteProgram(highlightProgram);
 		highlightProgram = 0;
 	}
-	if (horizonProgram != 0) {
+	clearCrossLabels();
+    if (labelVBO) glDeleteBuffers(1, &labelVBO);
+    if (labelVAO) glDeleteVertexArrays(1, &labelVAO);
+    if (labelProgram) glDeleteProgram(labelProgram);
+    if (horizonProgram != 0) {
 		glDeleteProgram(horizonProgram);
 		horizonProgram = 0;
 	}
@@ -246,28 +268,136 @@ void FlatWindow::renderHighlights()
 //--
 void FlatWindow::renderHorizons()
 {
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	if (horizon.empty()) return;
-
-	glUseProgram(horizonProgram);
-
-	glfwGetFramebufferSize(handle, &Wwidth, &Wheight);
-	//Передача данных
-	glUniform1f(glGetUniformLocation(horizonProgram, "zoom"), zoom);
-	glUniform2f(glGetUniformLocation(horizonProgram, "imageSize"), width, height);
-	glUniform2f(glGetUniformLocation(horizonProgram, "offset"), offsetX, offsetY*dT);
-	glUniform2f(glGetUniformLocation(horizonProgram, "windowSize"), Wwidth, Wheight);
-	glUniform2f(glGetUniformLocation(horizonProgram, "pixelRatio"), pixelRatioX, pixelRatioY);
-
-	for (int i = 0; i < horizon.size(); i += width) {
-		glUniform3f(glGetUniformLocation(horizonProgram, "uColor"), 0.0, (float)i/horizon.size(), 0.0);
-		glBindVertexArray(VAO1);
-		glLineWidth(5.0f);
-		glDrawArrays(GL_LINE_STRIP_ADJACENCY, i, width);
-		glBindVertexArray(0);
-	}
-	glDisable(GL_BLEND);
+    if (!showHorizons || horizons.empty()) return;
+    glUseProgram(horizonProgram);
+    glUniform1f(glGetUniformLocation(horizonProgram, "zoom"), zoom);
+    glUniform2f(glGetUniformLocation(horizonProgram, "imageSize"), width, height);
+    glUniform2f(glGetUniformLocation(horizonProgram, "offset"), offsetX, offsetY*dT);
+    glUniform2f(glGetUniformLocation(horizonProgram, "windowSize"), Wwidth, Wheight);
+    glUniform2f(glGetUniformLocation(horizonProgram, "pixelRatio"), pixelRatioX, pixelRatioY);
+    glUniform3f(glGetUniformLocation(horizonProgram, "uColor"), 1.0f, 1.0f, 1.0f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
+    glBindVertexArray(VAO1);
+    glLineWidth(3.0f);
+    for (const auto& h : horizons) {
+        // Split on missing ordinates so gaps do not join separate picks.
+        std::vector<float> segment;
+        auto flush = [&]() {
+            if (segment.size() >= 4) {
+                glBindBuffer(GL_ARRAY_BUFFER, VBO1);
+                glBufferData(GL_ARRAY_BUFFER, segment.size()*sizeof(float), segment.data(), GL_DYNAMIC_DRAW);
+                glDrawArrays(GL_LINE_STRIP, 0, segment.size()/2);
+            }
+            segment.clear();
+        };
+        for (size_t x = 0; x < h.points.size() && x < static_cast<size_t>(width); ++x) {
+            if (!std::isfinite(h.points[x]) || h.points[x] < 0) { flush(); continue; }
+            segment.push_back(static_cast<float>(x));
+            segment.push_back(h.points[x]);
+        }
+        flush();
+    }
+    glBindVertexArray(0);
+    glDisable(GL_BLEND);
+}
+void FlatWindow::renderCrosses()
+{
+    if (!showCrosses || crosses.empty()) return;
+    glUseProgram(horizonProgram);
+    glUniform1f(glGetUniformLocation(horizonProgram, "zoom"), zoom);
+    glUniform2f(glGetUniformLocation(horizonProgram, "offset"), offsetX, offsetY*dT);
+    glUniform2f(glGetUniformLocation(horizonProgram, "windowSize"), Wwidth, Wheight);
+    glUniform2f(glGetUniformLocation(horizonProgram, "pixelRatio"), pixelRatioX, pixelRatioY);
+    glUniform3f(glGetUniformLocation(horizonProgram, "uColor"), 1.0f, 1.0f, 1.0f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
+    glBindVertexArray(VAO1);
+    glLineWidth(2.0f);
+    for (const auto& cross : crosses) {
+        if (cross.x < 0 || cross.x >= width) continue;
+        float line[] = {static_cast<float>(cross.x), 0.0f,
+                        static_cast<float>(cross.x), static_cast<float>(height)*dT};
+        glBindBuffer(GL_ARRAY_BUFFER, VBO1);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(line), line, GL_DYNAMIC_DRAW);
+        glDrawArrays(GL_LINES, 0, 2);
+    }
+    glBindVertexArray(0);
+    glDisable(GL_BLEND);
+    renderCrossLabels();
+}
+void FlatWindow::renderCrossLabels()
+{
+    glUseProgram(labelProgram);
+    glUniform2f(glGetUniformLocation(labelProgram, "windowSize"), Wwidth, Wheight);
+    glUniform1i(glGetUniformLocation(labelProgram, "label"), 0);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(labelVAO);
+    for (size_t i = 0; i < crosses.size() && i < crossLabels.size(); ++i) {
+        const auto& label = crossLabels[i];
+        float x = (crosses[i].x-offsetX)*zoom/pixelRatioX;
+        if (!label.texture || x < -label.width || x >= Wwidth) continue;
+        x = std::max(0.0f, std::min(x + 4.0f, static_cast<float>(Wwidth-label.width)));
+        const float y = 4.0f, w = static_cast<float>(label.width), h = static_cast<float>(label.height);
+        const float quad[] = {x,y,0,0, x+w,y,1,0, x+w,y+h,1,1,
+                              x,y,0,0, x+w,y+h,1,1, x,y+h,0,1};
+        glBindTexture(GL_TEXTURE_2D, label.texture);
+        glBindBuffer(GL_ARRAY_BUFFER, labelVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_DYNAMIC_DRAW);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+    }
+    glBindVertexArray(0);
+    glDisable(GL_BLEND);
+}
+void FlatWindow::clearCrossLabels() {
+    for (auto& label : crossLabels) if (label.texture) glDeleteTextures(1, &label.texture);
+    crossLabels.clear();
+}
+void FlatWindow::setCrosses(const std::vector<Cross>& value) {
+    crosses = value;
+    if (!handle) return;
+    glfwMakeContextCurrent(handle);
+    clearCrossLabels();
+    for (const auto& cross : crosses) {
+        CrossLabel label = {0, 0, 0};
+        if (!cross.name.empty()) {
+            std::unique_ptr<Graphics::TBitmap> bitmap(new Graphics::TBitmap);
+            bitmap->PixelFormat = pf24bit;
+            bitmap->Canvas->Font->Name = L"Arial";
+            bitmap->Canvas->Font->Size = 10;
+            label.width = std::max(1, bitmap->Canvas->TextWidth(cross.name.c_str()) + 4);
+            label.height = std::max(1, bitmap->Canvas->TextHeight(cross.name.c_str()) + 4);
+            bitmap->SetSize(label.width, label.height);
+            bitmap->Canvas->Brush->Color = clBlack;
+            bitmap->Canvas->FillRect(Rect(0, 0, label.width, label.height));
+            bitmap->Canvas->Font->Name = L"Arial";
+            bitmap->Canvas->Font->Size = 10;
+            bitmap->Canvas->Font->Color = clWhite;
+            bitmap->Canvas->Brush->Style = bsClear;
+            bitmap->Canvas->TextOut(2, 2, cross.name.c_str());
+            // TBitmap ScanLine has a padded stride and bottom-up row order.
+            std::vector<uint8_t> pixels(static_cast<size_t>(label.width)*label.height*3);
+            for (int y = 0; y < label.height; ++y)
+                std::copy_n(static_cast<uint8_t*>(bitmap->ScanLine[y]), label.width*3,
+                            pixels.data()+static_cast<size_t>(y)*label.width*3);
+            glGenTextures(1, &label.texture);
+            glBindTexture(GL_TEXTURE_2D, label.texture);
+            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, label.width, label.height, 0, GL_BGR, GL_UNSIGNED_BYTE, pixels.data());
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        }
+        crossLabels.push_back(label);
+    }
+    renderWindow();
+}
+void FlatWindow::setHorizons(const std::vector<Horizon>& value) {
+    horizons = value;
+    horNum = 0;
+    firstPoint = true;
+    renderWindow();
 }
 //--
 void FlatWindow::postRender()
@@ -279,6 +409,7 @@ void FlatWindow::postRender()
 
 	renderHighlights();
 	renderHorizons();
+    renderCrosses();
 }
 //--
 void FlatWindow::renderWindow(){};
@@ -324,7 +455,7 @@ void FlatWindow::handleCursorPosDrawCallback(double _xpos, double _ypos) {
 	if (isDragging) {
 		int imgX = _xpos*pixelRatioX/zoom + offsetX;
 		int imgY = _ypos*pixelRatioY/zoom/dT + offsetY;
-		addPoint(imgX+width*horNum, imgY);
+		addPoint(imgX, imgY);
 
 		renderWindow();
 	}
@@ -405,78 +536,67 @@ void FlatWindow::clampOffsets() {
 	offsetY = std::max(0.0f, std::min(offsetY, static_cast<float>(height) - visibleHeight));
 }
 
- void FlatWindow::setHorizon(const std::vector<float>& data) {
-		horizon = data;
-		updateGPUData();
-	}
-
-
- void FlatWindow::updateGPUData() {
-		std::vector<float> vertices;
-		vertices.reserve(horizon.size() * 2);
-		// Преобразуем в координаты OpenGL: X от 0 до 1, Y от 0 до 1
-		for (size_t i = 0; i < horizon.size(); ++i) {
-			float x = static_cast<float>(i%width);
-			vertices.push_back(x);
-			vertices.push_back(horizon[i]);
-		}
-		glBindBuffer(GL_ARRAY_BUFFER, VBO1);
-		glBufferData(GL_ARRAY_BUFFER,
-					vertices.size() * sizeof(float),
-					vertices.data(),
-					GL_DYNAMIC_DRAW);
-	}
-
-	void FlatWindow::updateGPUPoint(int indexL, int indexR) {
-		// Обновляем только одну точку в GPU буфере
-		for (int index = indexL; index <= indexR; index++) {
-		float x = static_cast<float>(index%width);
-		float point[2] = {x, horizon[index]};
-
-		glBindBuffer(GL_ARRAY_BUFFER, VBO1);
-		glBufferSubData(GL_ARRAY_BUFFER,
-					   index * 2 * sizeof(float),
-					   2 * sizeof(float),
-					   point);
-		}
-	}
-	void FlatWindow::addPoint(float x, float y) {
-		if (firstPoint) {
-            // Первая точка - просто запоминаем
-			lastPosX = x;
-			lastPosY = y*dT;
-            firstPoint = false;
-            return;
+void FlatWindow::selectHorizon(size_t index) {
+    if (index > 10000) return;
+    while (horizons.size() <= index) {
+        Horizon next;
+        next.name = L"Horizon " + std::to_wstring(horizons.size()+1);
+        next.points.assign(width, -1.0f);
+        horizons.push_back(std::move(next));
+    }
+    horNum = index;
+    firstPoint = true;
+    isDrawing = true;
+    renderWindow();
+}
+std::vector<float> FlatWindow::getHorizon() {
+    std::vector<float> out;
+    for (const auto& h : horizons) out.insert(out.end(), h.points.begin(), h.points.end());
+    return out;
+}
+void FlatWindow::setHorizon(const std::vector<float>& data) {
+    // Legacy text/binary format concatenates width-long picks.
+    horizons.clear();
+    if (width > 0) {
+        for (size_t start = 0; start < data.size(); start += width) {
+            Horizon h;
+            h.name = L"Horizon " + std::to_wstring(horizons.size()+1);
+            h.points.assign(data.begin()+start,
+                            data.begin()+std::min(start+static_cast<size_t>(width), data.size()));
+            horizons.push_back(std::move(h));
         }
-
-		// Интерполируем между последней точкой и новой
-		interpolateBetweenPoints(lastPosX, lastPosY, x, y*dT);
-
-        // Обновляем последнюю точку
-		lastPosX = x;
-		lastPosY = y*dT;
-	}
-	void FlatWindow::interpolateBetweenPoints(float x1, float y1, float x2, float y2) {
-		int startIdx = static_cast<int>(x1);
-		int endIdx = static_cast<int>(x2);
-
-        // Обеспечиваем правильный порядок
-		if (startIdx > endIdx) {
-			std::swap(startIdx, endIdx);
-            std::swap(x1, x2);
-            std::swap(y1, y2);
-        }
-
-        // Интерполируем все точки между startIdx и endIdx
-        for (int i = startIdx; i <= endIdx && i < width*(horNum+1); ++i) {
-            float t = (i - startIdx) / (float)(endIdx - startIdx + 1);
-            t = std::max(0.0f, std::min(1.0f, t)); // Кламп [0, 1]
-
-            // Линейная интерполяция
-			horizon[i] = y1 + (y2 - y1) * t;
-		}
-		updateGPUPoint(startIdx, endIdx);
-	}
+    }
+    horNum = 0;
+    firstPoint = true;
+    renderWindow();
+}
+void FlatWindow::addPoint(float x, float y) {
+    if (horizons.empty()) horizons.push_back({L"Horizon", std::vector<float>(width, -1.0f)});
+    if (firstPoint) {
+        lastPosX = x;
+        lastPosY = y*dT;
+        firstPoint = false;
+        return;
+    }
+    interpolateBetweenPoints(lastPosX, lastPosY, x, y*dT);
+    lastPosX = x;
+    lastPosY = y*dT;
+}
+void FlatWindow::interpolateBetweenPoints(float x1, float y1, float x2, float y2) {
+    if (horNum >= horizons.size()) return;
+    auto& picked = horizons[horNum].points;
+    if (picked.size() < static_cast<size_t>(width)) picked.resize(width, -1.0f);
+    int start = static_cast<int>(x1), end = static_cast<int>(x2);
+    if (start > end) {std::swap(start, end); std::swap(y1, y2);}
+    if (start == end) {
+        if (start >= 0 && start < width) picked[start] = y2;
+        return;
+    }
+    for (int i = std::max(0,start); i <= std::min(width-1,end); ++i) {
+        const float t = static_cast<float>(i-start)/(end-start);
+        picked[i] = y1+(y2-y1)*t;
+    }
+}
 
 		void FlatWindow::setMouseButtonCallback(std::function<void(int, int, int)> callback){
 	mouseButtonCallback = callback;

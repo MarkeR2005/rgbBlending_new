@@ -168,6 +168,10 @@ std::vector<bitMap> RgbData::getTexture(){
 	}
 	return std::vector<bitMap>();
 }
+bitMap RgbData::getTexture(int filterIndex){
+    if (!mng || filterIndex < 0 || filterIndex >= filters) return {};
+    return mng->getTexture(data[filterIndex]);
+}
 //------------------------------------------------------------------------------
 //Transformation
 //------------------------------------------------------------------------------

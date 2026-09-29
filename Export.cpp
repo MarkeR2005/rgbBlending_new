@@ -13,6 +13,32 @@
 #include "ChooseForm.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
+bool setTraceCallback(TForm* f, std::function<void(int)> cb) {
+    auto* form = dynamic_cast<TFormUniversal*>(f);
+    if (!form || !form->windowContainer) return false;
+    form->setTraceCallback(std::move(cb));
+    return true;
+}
+bool setDisplayCallback(TForm* f, std::function<void(int, int)> cb) {
+    auto* form = dynamic_cast<TFormUniversal*>(f);
+    if (!form || !form->windowContainer) return false;
+    form->setDisplayCallback(std::move(cb));
+    return true;
+}
+bool setHorizonsCallback(TForm* f, std::function<void(const std::vector<Horizon>&)> cb) {
+    auto* form = dynamic_cast<TFormUniversal*>(f);
+    if (!form || !form->windowContainer) return false;
+    form->setHorizonsCallback(std::move(cb));
+    return true;
+}
+bool setHorizons(TForm* f, const std::vector<Horizon>& horizons) {
+    auto* form = dynamic_cast<TFormUniversal*>(f);
+    return form && form->windowContainer && form->setHorizons(horizons);
+}
+bool setCrosses(TForm* f, const std::vector<Cross>& crosses) {
+    auto* form = dynamic_cast<TFormUniversal*>(f);
+    return form && form->windowContainer && form->setCrosses(crosses);
+}
 void init(){
 ShowMessage("Init");
 return;
@@ -63,8 +89,8 @@ TForm* CreateRgbBlendingForm(System::UnicodeString path, std::function<void(int)
 		choose->SetRGBPath(path);
         if (choose->Execute() && choose->execType!=0){
             TFormUniversal* form = new TFormUniversal(Application->MainForm, path);
-			form->setTraceCallback(callback);
-            form->setDisplayCallback(callbackDisplay);
+			setTraceCallback(form, callback);
+            setDisplayCallback(form, callbackDisplay);
             switch (choose->execType) {
             case 1:
             	{

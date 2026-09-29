@@ -43,7 +43,8 @@ std::string readSourceFromFile(std::wstring fileName)
 
 GLuint compileShaderFromFile(GLenum type, std::wstring fileName)
 {
-	const char* source = readSourceFromFile(fileName).c_str();
+	std::string contents = readSourceFromFile(fileName);
+    const char* source = contents.c_str();
 	//ShowMessage(source);
 	GLuint shader = glCreateShader(type);
 	glShaderSource(shader, 1, &source, NULL);
@@ -63,7 +64,8 @@ GLuint compileShaderFromFile(GLenum type, std::wstring fileName)
 }
 GLuint compileShader(GLenum type, std::string fileName)
 {
-	const char* source = readSource(fileName.c_str()).c_str();
+	std::string contents = readSource(fileName.c_str());
+    const char* source = contents.c_str();
 	//ShowMessage(source);
 	GLuint shader = glCreateShader(type);
 	glShaderSource(shader, 1, &source, NULL);

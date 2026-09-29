@@ -9,6 +9,8 @@
 #include <Windows.h>
 #include "BaseWindow.h"
 #include "Structures.h"
+#include <memory>
+class RgbData;
 #ifndef RgbWindowH
 #define RgbWindowH
 //---------------------------------------------------------------------------
@@ -20,7 +22,7 @@ class RgbWindow : public FlatWindow, public IRgbWindow
 	//--
 	void initWindow(TPanel* parent) override;
 	//--
-	void initTexture(const std::vector<bitMap>& textures);
+	void initData(std::shared_ptr<RgbData> data);
 	//--
 	void renderWindow() override;
 
@@ -41,7 +43,10 @@ class RgbWindow : public FlatWindow, public IRgbWindow
 
 	GLuint indexTexture = 0;
 	//
-	int size;
+	std::shared_ptr<RgbData> source;
+	bool textureDirty = true;
+    int allocatedWidth = 0, allocatedHeight = 0;
+	void updateComposite();
 };
 #endif
 
