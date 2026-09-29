@@ -502,14 +502,16 @@ void TWindowContainer::setupFlatButtons(){
         tree->SetBounds(12, 12, 346, 270);
         TTreeNode* root = tree->Items->Add(nullptr, L"Горизонты");
         const auto& horizons = flat->getHorizons();
+        TTreeNode* firstNode = nullptr;
         for (size_t i = 0; i < horizons.size(); ++i) {
             const std::wstring name = horizons[i].name.empty()
                 ? L"Горизонт " + std::to_wstring(i+1) : horizons[i].name;
-            tree->Items->AddChild(root, name.c_str());
+            TTreeNode* node = tree->Items->AddChild(root, name.c_str());
+            if (!firstNode) firstNode = node;
         }
         TTreeNode* createNode = tree->Items->AddChild(root, L"+ Новый горизонт");
         root->Expand(true);
-        tree->Selected = horizons.empty() ? createNode : tree->Items->Item[1];
+        tree->Selected = firstNode ? firstNode : createNode;
 
         TLabel* nameLabel = new TLabel(picker.get());
         nameLabel->Parent = picker.get();
