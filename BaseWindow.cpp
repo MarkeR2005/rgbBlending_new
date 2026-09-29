@@ -183,7 +183,8 @@ FlatWindow::~FlatWindow(){
 		glDeleteProgram(highlightProgram);
 		highlightProgram = 0;
 	}
-	clearCrossLabels();
+    clearLabels(crossLabels);
+    clearLabels(horizonLabels);
     if (labelVBO) glDeleteBuffers(1, &labelVBO);
     if (labelVAO) glDeleteVertexArrays(1, &labelVAO);
     if (labelProgram) glDeleteProgram(labelProgram);
@@ -300,6 +301,7 @@ void FlatWindow::renderHorizons()
     }
     glBindVertexArray(0);
     glDisable(GL_BLEND);
+    renderHorizonLabels();
 }
 void FlatWindow::renderCrosses()
 {
@@ -326,8 +328,18 @@ void FlatWindow::renderCrosses()
     glDisable(GL_BLEND);
     renderCrossLabels();
 }
-void FlatWindow::renderCrossLabels()
-{
+void FlatWindow::drawLabel(const TextLabel& label, float x, float y) {
+    if (!label.texture || x <= -label.width || x >= Wwidth ||
+        y <= -label.height || y >= Wheight) return;
+    const float w = static_cast<float>(label.width), h = static_cast<float>(label.height);
+    const float quad[] = {x,y,0,0, x+w,y,1,0, x+w,y+h,1,1,
+                          x,y,0,0, x+w,y+h,1,1, x,y+h,0,1};
+    glBindTexture(GL_TEXTURE_2D, label.texture);
+    glBindBuffer(GL_ARRAY_BUFFER, labelVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+void FlatWindow::renderCrossLabels() {
     glUseProgram(labelProgram);
     glUniform2f(glGetUniformLocation(labelProgram, "windowSize"), Wwidth, Wheight);
     glUniform1i(glGetUniformLocation(labelProgram, "label"), 0);
@@ -336,67 +348,97 @@ void FlatWindow::renderCrossLabels()
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(labelVAO);
     for (size_t i = 0; i < crosses.size() && i < crossLabels.size(); ++i) {
-        const auto& label = crossLabels[i];
-        float x = (crosses[i].x-offsetX)*zoom/pixelRatioX;
-        if (!label.texture || x < -label.width || x >= Wwidth) continue;
-        x = std::max(0.0f, std::min(x + 4.0f, static_cast<float>(Wwidth-label.width)));
-        const float y = 4.0f, w = static_cast<float>(label.width), h = static_cast<float>(label.height);
-        const float quad[] = {x,y,0,0, x+w,y,1,0, x+w,y+h,1,1,
-                              x,y,0,0, x+w,y+h,1,1, x,y+h,0,1};
-        glBindTexture(GL_TEXTURE_2D, label.texture);
-        glBindBuffer(GL_ARRAY_BUFFER, labelVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_DYNAMIC_DRAW);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        const float x = (crosses[i].x-offsetX)*zoom/pixelRatioX;
+        drawLabel(crossLabels[i], x+4.0f, 4.0f);
     }
     glBindVertexArray(0);
     glDisable(GL_BLEND);
 }
-void FlatWindow::clearCrossLabels() {
-    for (auto& label : crossLabels) if (label.texture) glDeleteTextures(1, &label.texture);
-    crossLabels.clear();
+void FlatWindow::renderHorizonLabels() {
+    glUseProgram(labelProgram);
+    glUniform2f(glGetUniformLocation(labelProgram, "windowSize"), Wwidth, Wheight);
+    glUniform1i(glGetUniformLocation(labelProgram, "label"), 0);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(labelVAO);
+    for (size_t i = 0; i < horizons.size() && i < horizonLabels.size() &&
+                       i < firstHorizonPoints.size(); ++i) {
+        const int x = firstHorizonPoints[i];
+        if (x < 0 || x >= static_cast<int>(horizons[i].points.size())) continue;
+        const float sx = (x-offsetX)*zoom/pixelRatioX;
+        const float sy = (horizons[i].points[x]-offsetY*dT)*zoom/pixelRatioY;
+        drawLabel(horizonLabels[i], sx+3.0f,
+                  sy-horizonLabels[i].height-4.0f);
+    }
+    glBindVertexArray(0);
+    glDisable(GL_BLEND);
+}
+void FlatWindow::clearLabels(std::vector<TextLabel>& labels) {
+    for (auto& label : labels) if (label.texture) glDeleteTextures(1, &label.texture);
+    labels.clear();
+}
+FlatWindow::TextLabel FlatWindow::makeLabel(const std::wstring& name) {
+    TextLabel label = {0, 0, 0};
+    if (name.empty()) return label;
+    std::unique_ptr<Graphics::TBitmap> bitmap(new Graphics::TBitmap);
+    bitmap->PixelFormat = pf24bit;
+    bitmap->Canvas->Font->Name = L"Arial";
+    bitmap->Canvas->Font->Size = 10;
+    label.width = std::max(1, bitmap->Canvas->TextWidth(name.c_str()) + 4);
+    label.height = std::max(1, bitmap->Canvas->TextHeight(name.c_str()) + 4);
+    bitmap->SetSize(label.width, label.height);
+    bitmap->Canvas->Brush->Color = clBlack;
+    bitmap->Canvas->FillRect(Rect(0, 0, label.width, label.height));
+    bitmap->Canvas->Font->Name = L"Arial";
+    bitmap->Canvas->Font->Size = 10;
+    bitmap->Canvas->Font->Color = clWhite;
+    bitmap->Canvas->Brush->Style = bsClear;
+    bitmap->Canvas->TextOut(2, 2, name.c_str());
+    std::vector<uint8_t> pixels(static_cast<size_t>(label.width)*label.height*3);
+    for (int y = 0; y < label.height; ++y)
+        std::copy_n(static_cast<uint8_t*>(bitmap->ScanLine[y]), label.width*3,
+                    pixels.data()+static_cast<size_t>(y)*label.width*3);
+    glGenTextures(1, &label.texture);
+    glBindTexture(GL_TEXTURE_2D, label.texture);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, label.width, label.height, 0,
+                 GL_BGR, GL_UNSIGNED_BYTE, pixels.data());
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    return label;
+}
+void FlatWindow::updateHorizonLabels() {
+    if (!handle) return;
+    glfwMakeContextCurrent(handle);
+    clearLabels(horizonLabels);
+    firstHorizonPoints.clear();
+    for (const auto& horizon : horizons) {
+        horizonLabels.push_back(makeLabel(horizon.name));
+        int first = -1;
+        for (size_t x = 0; x < horizon.points.size() && x < static_cast<size_t>(width); ++x) {
+            if (std::isfinite(horizon.points[x]) && horizon.points[x] >= 0) {
+                first = static_cast<int>(x);
+                break;
+            }
+        }
+        firstHorizonPoints.push_back(first);
+    }
 }
 void FlatWindow::setCrosses(const std::vector<Cross>& value) {
     crosses = value;
     if (!handle) return;
     glfwMakeContextCurrent(handle);
-    clearCrossLabels();
-    for (const auto& cross : crosses) {
-        CrossLabel label = {0, 0, 0};
-        if (!cross.name.empty()) {
-            std::unique_ptr<Graphics::TBitmap> bitmap(new Graphics::TBitmap);
-            bitmap->PixelFormat = pf24bit;
-            bitmap->Canvas->Font->Name = L"Arial";
-            bitmap->Canvas->Font->Size = 10;
-            label.width = std::max(1, bitmap->Canvas->TextWidth(cross.name.c_str()) + 4);
-            label.height = std::max(1, bitmap->Canvas->TextHeight(cross.name.c_str()) + 4);
-            bitmap->SetSize(label.width, label.height);
-            bitmap->Canvas->Brush->Color = clBlack;
-            bitmap->Canvas->FillRect(Rect(0, 0, label.width, label.height));
-            bitmap->Canvas->Font->Name = L"Arial";
-            bitmap->Canvas->Font->Size = 10;
-            bitmap->Canvas->Font->Color = clWhite;
-            bitmap->Canvas->Brush->Style = bsClear;
-            bitmap->Canvas->TextOut(2, 2, cross.name.c_str());
-            // TBitmap ScanLine has a padded stride and bottom-up row order.
-            std::vector<uint8_t> pixels(static_cast<size_t>(label.width)*label.height*3);
-            for (int y = 0; y < label.height; ++y)
-                std::copy_n(static_cast<uint8_t*>(bitmap->ScanLine[y]), label.width*3,
-                            pixels.data()+static_cast<size_t>(y)*label.width*3);
-            glGenTextures(1, &label.texture);
-            glBindTexture(GL_TEXTURE_2D, label.texture);
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, label.width, label.height, 0, GL_BGR, GL_UNSIGNED_BYTE, pixels.data());
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        }
-        crossLabels.push_back(label);
-    }
+    clearLabels(crossLabels);
+    for (const auto& cross : crosses)
+        crossLabels.push_back(makeLabel(cross.name));
     renderWindow();
 }
 void FlatWindow::setHorizons(const std::vector<Horizon>& value) {
     horizons = value;
     horNum = 0;
     firstPoint = true;
+    updateHorizonLabels();
     renderWindow();
 }
 //--
@@ -536,7 +578,7 @@ void FlatWindow::clampOffsets() {
 	offsetY = std::max(0.0f, std::min(offsetY, static_cast<float>(height) - visibleHeight));
 }
 
-void FlatWindow::selectHorizon(size_t index) {
+void FlatWindow::selectHorizon(size_t index, const std::wstring& name) {
     if (index > 10000) return;
     while (horizons.size() <= index) {
         Horizon next;
@@ -544,6 +586,8 @@ void FlatWindow::selectHorizon(size_t index) {
         next.points.assign(width, -1.0f);
         horizons.push_back(std::move(next));
     }
+    if (!name.empty()) horizons[index].name = name;
+    updateHorizonLabels();
     horNum = index;
     firstPoint = true;
     isDrawing = true;
@@ -568,10 +612,14 @@ void FlatWindow::setHorizon(const std::vector<float>& data) {
     }
     horNum = 0;
     firstPoint = true;
+    updateHorizonLabels();
     renderWindow();
 }
 void FlatWindow::addPoint(float x, float y) {
-    if (horizons.empty()) horizons.push_back({L"Horizon", std::vector<float>(width, -1.0f)});
+    if (horizons.empty()) {
+        horizons.push_back({L"Horizon", std::vector<float>(width, -1.0f)});
+        updateHorizonLabels();
+    }
     if (firstPoint) {
         lastPosX = x;
         lastPosY = y*dT;
@@ -589,12 +637,20 @@ void FlatWindow::interpolateBetweenPoints(float x1, float y1, float x2, float y2
     int start = static_cast<int>(x1), end = static_cast<int>(x2);
     if (start > end) {std::swap(start, end); std::swap(y1, y2);}
     if (start == end) {
-        if (start >= 0 && start < width) picked[start] = y2;
+        if (start >= 0 && start < width) {
+            picked[start] = y2;
+            if (horNum < firstHorizonPoints.size() &&
+                (firstHorizonPoints[horNum] < 0 || start < firstHorizonPoints[horNum]))
+                firstHorizonPoints[horNum] = start;
+        }
         return;
     }
     for (int i = std::max(0,start); i <= std::min(width-1,end); ++i) {
         const float t = static_cast<float>(i-start)/(end-start);
         picked[i] = y1+(y2-y1)*t;
+        if (horNum < firstHorizonPoints.size() &&
+            (firstHorizonPoints[horNum] < 0 || i < firstHorizonPoints[horNum]))
+            firstHorizonPoints[horNum] = i;
     }
 }
 

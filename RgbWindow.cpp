@@ -6,6 +6,7 @@
 #include <GL/glew.h>
 #include <array>
 #include <map>
+#include <list>
 #include <algorithm>
 #pragma package(smart_init)
 
@@ -30,6 +31,9 @@ void RgbWindow::initData(std::shared_ptr<RgbData> data) {
     G = 0;
     B = 0;
     textureDirty = true;
+    layerCache.clear();
+    cachedBytes = 0;
+    compositePixels.clear();
     glfwMakeContextCurrent(handle);
     if (!indexTexture) glGenTextures(1, &indexTexture);
     glBindTexture(GL_TEXTURE_2D, indexTexture);
@@ -39,39 +43,80 @@ void RgbWindow::initData(std::shared_ptr<RgbData> data) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     updateComposite();
 }
+bool RgbWindow::hasCachedLayers(int r, int g, int b) const {
+    const std::array<int, 3> indices = {{r, g, b}};
+    for (int index : indices) {
+        bool found = false;
+        for (const auto& cached : layerCache)
+            if (cached.index == index) {found = true; break;}
+        if (!found) return false;
+    }
+    return true;
+}
+std::shared_ptr<bitMap> RgbWindow::loadLayer(int index) {
+    for (auto it = layerCache.begin(); it != layerCache.end(); ++it) {
+        if (it->index == index) {
+            auto layer = it->bitmap;
+            layerCache.splice(layerCache.begin(), layerCache, it);
+            return layer;
+        }
+    }
+    auto layer = std::make_shared<bitMap>(source->getTexture(index));
+    const size_t bytes = layer->texture.size();
+    const size_t budget = 128u * 1024u * 1024u;
+    if (bytes <= budget) {
+        layerCache.push_front({index, layer});
+        cachedBytes += bytes;
+        while (layerCache.size() > 8 || cachedBytes > budget) {
+            cachedBytes -= layerCache.back().bitmap->texture.size();
+            layerCache.pop_back();
+        }
+    }
+    return layer;
+}
 void RgbWindow::updateComposite() {
     if (!textureDirty || !source || !handle) return;
     glfwMakeContextCurrent(handle);
     const int maxIndex = source->getSize().f - 1;
     const std::array<int, 3> channels = {{R, G, B}};
-    std::map<int, bitMap> selected;
-    for (int index : channels) {
+    std::array<std::shared_ptr<bitMap>, 3> selected;
+    for (int c = 0; c < 3; ++c) {
+        const int index = channels[c];
         if (index < 0 || index > maxIndex) throw Exception("RGB channel out of range");
-        if (selected.find(index) == selected.end()) selected.emplace(index, source->getTexture(index));
+        // Avoid converting the same frequency twice if two channels coincide.
+        int same = 0;
+        while (same < c && channels[same] != index) ++same;
+        selected[c] = same < c ? selected[same] : loadLayer(index);
     }
-    const bitMap& first = selected.at(R);
-    width = first.width;
-    height = first.height;
+    width = selected[0]->width;
+    height = selected[0]->height;
     if (width <= 0 || height <= 0) throw Exception("Empty RGB layer");
     const size_t pixelCount = static_cast<size_t>(width) * height;
-    std::vector<uint8_t> composite(pixelCount * 3);
+    const auto& red = selected[0]->texture;
+    const auto& green = selected[1]->texture;
+    const auto& blue = selected[2]->texture;
+    if (red.size() != pixelCount || green.size() != pixelCount || blue.size() != pixelCount)
+        throw Exception("Invalid RGB layer size");
+    compositePixels.resize(pixelCount * 3);
+    uint8_t* dst = compositePixels.data();
+    const uint8_t* r = red.data();
+    const uint8_t* g = green.data();
+    const uint8_t* b = blue.data();
     for (size_t i = 0; i < pixelCount; ++i) {
-        for (int c = 0; c < 3; ++c) {
-            const auto& layer = selected.at(channels[c]).texture;
-            if (layer.size() != pixelCount) throw Exception("Invalid RGB layer size");
-            composite[3*i+c] = layer[i];
-        }
+        dst[3*i] = r[i];
+        dst[3*i+1] = g[i];
+        dst[3*i+2] = b[i];
     }
     glBindTexture(GL_TEXTURE_2D, indexTexture);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     if (allocatedWidth != width || allocatedHeight != height) {
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, width, height, 0,
-                     GL_RGB, GL_UNSIGNED_BYTE, composite.data());
+                     GL_RGB, GL_UNSIGNED_BYTE, compositePixels.data());
         allocatedWidth = width;
         allocatedHeight = height;
     } else {
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height,
-                        GL_RGB, GL_UNSIGNED_BYTE, composite.data());
+                        GL_RGB, GL_UNSIGNED_BYTE, compositePixels.data());
     }
     if (glGetError() != GL_NO_ERROR) throw Exception("RGB texture upload failed");
     textureDirty = false;

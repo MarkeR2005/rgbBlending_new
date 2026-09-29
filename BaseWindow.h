@@ -52,7 +52,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
     void setCrossesVisible(bool value) {showCrosses = value; renderWindow();}
     void setHorizonEditing(bool value) {isDrawing = value; firstPoint = true;}
     bool horizonEditing() const {return isDrawing;}
-    void selectHorizon(size_t index);
+    void selectHorizon(size_t index, const std::wstring& name = L"");
 	float getDT() override {return dT;};
 	//Setters
 	virtual void setOffset(float ox, float oy) override {offsetX = ox;offsetY = oy;};
@@ -117,11 +117,16 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
     bool showHorizons = true, showCrosses = true;
     std::vector<Horizon> horizons;
     std::vector<Cross> crosses;
-    struct CrossLabel { GLuint texture; int width; int height; };
-    std::vector<CrossLabel> crossLabels;
+    struct TextLabel { GLuint texture; int width; int height; };
+    std::vector<TextLabel> crossLabels, horizonLabels;
+    std::vector<int> firstHorizonPoints;
     GLuint labelProgram = 0, labelVAO = 0, labelVBO = 0;
-    void clearCrossLabels();
+    void clearLabels(std::vector<TextLabel>& labels);
+    TextLabel makeLabel(const std::wstring& name);
+    void updateHorizonLabels();
+    void drawLabel(const TextLabel& label, float x, float y);
     void renderCrossLabels();
+    void renderHorizonLabels();
 	std::vector<point2> highlighted_points = {};
 	//static std::vector<FlatWindow*> instances_;
 

@@ -13,6 +13,7 @@
 #include "Reader.h"
 #include "SeismicPlane.h"
 #include "RgbPlane.h"
+#include <Vcl.ComCtrls.hpp>
 #include <thread>
 #include <chrono>
 //---------------------------------------------------------------------------
@@ -37,6 +38,10 @@ __fastcall TWindowContainer::TWindowContainer(TComponent* Owner) : TPanel(Owner)
     updateHorizonsButton->Caption = L"Обновить горизонты";
     updateHorizonsButton->OnClick = UpdateHorizonsClick;
     updateHorizonsButton->Visible = false;
+    rgbChangeTimer = new TTimer(this);
+    rgbChangeTimer->Enabled = false;
+    rgbChangeTimer->Interval = 250;
+    rgbChangeTimer->OnTimer = ApplyRgbChannels;
 
 	image1 = new TImage(this);
 	image1->Height = 1440;
@@ -175,6 +180,8 @@ void __fastcall TWindowContainer::UpdateHorizonsClick(TObject*) {
     }
 }
 void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
+    rgbChangeTimer->Enabled = false;
+    appliedR = appliedG = appliedB = pendingR = pendingG = pendingB = 0;
 	if (!data->getCM()) {
 		data->setCM(colorManager);
 	}
@@ -229,6 +236,7 @@ void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
 
 
 void TWindowContainer::initialize(){
+    rgbChangeTimer->Enabled = false;
 	std::unique_ptr<ViewportWindow>window_ = std::make_unique<ViewportWindow>();
 	window_->initWindow(viewPanel);
 //    seismicShader = createShaderProgram("volumetric", "seismic");
@@ -297,6 +305,7 @@ float TWindowContainer::getFreqByIndex(int idx){
 }
 
 __fastcall TWindowContainer::~TWindowContainer(){
+    if (rgbChangeTimer) rgbChangeTimer->Enabled = false;
     auto it = std::find(instances_.begin(), instances_.end(), this);
     if (it != instances_.end()) {
         instances_.erase(it);
@@ -317,14 +326,25 @@ void __fastcall TWindowContainer::Resize(TObject* Sender){
 	window->resizeWindow(viewPanel->Width, viewPanel->Height);
 	updateAxis(true);
 }
+void __fastcall TWindowContainer::ApplyRgbChannels(TObject*) {
+    rgbChangeTimer->Enabled = false;
+    auto* rgb = dynamic_cast<RgbWindow*>(window.get());
+    if (!rgb) return;
+    rgb->setColor(pendingR, pendingG, pendingB);
+    appliedR = pendingR; appliedG = pendingG; appliedB = pendingB;
+    rgb->renderWindow();
+}
 void TWindowContainer::setViewParams(viewParams params){
 	IRgbWindow* wd = dynamic_cast<IRgbWindow*>(window.get());
 	FlatWindow* wd1 = dynamic_cast<FlatWindow*>(window.get());
     IVolumeWindow* wd2 = dynamic_cast<IVolumeWindow*>(window.get());
 	if (wd != nullptr) {
-		wd->setColor(params.r,params.g,params.b);
-		wd->setView(params.isR, params.isG, params.isB);
-	}
+        wd->setView(params.isR, params.isG, params.isB);
+        pendingR = params.r; pendingG = params.g; pendingB = params.b;
+        rgbChangeTimer->Enabled = false;
+        if (pendingR != appliedR || pendingG != appliedG || pendingB != appliedB)
+            rgbChangeTimer->Enabled = true; // coalesce rapid scrollbar events
+    }
 	if (wd1 != nullptr) {
 		wd1->setContrast(params.contrast);
 	}
@@ -332,7 +352,13 @@ void TWindowContainer::setViewParams(viewParams params){
 		wd2->setChannels(params.r,params.g,params.b);
 		wd2->setChannelEnabled(params.isR, params.isG, params.isB);
 	}
-    window->renderWindow();
+    auto* rgb = dynamic_cast<RgbWindow*>(window.get());
+    if (rgb && rgbChangeTimer->Enabled &&
+        rgb->hasCachedLayers(pendingR, pendingG, pendingB)) {
+        ApplyRgbChannels(nullptr);
+    } else {
+        window->renderWindow();
+    }
 }
 void TWindowContainer::setRatio(){
 	FlatWindow* wd1 = dynamic_cast<FlatWindow*>(window.get());
@@ -464,11 +490,58 @@ void TWindowContainer::setupFlatButtons(){
         auto* flat = dynamic_cast<FlatWindow*>(window.get());
         if (!flat) return;
         if (flat->horizonEditing()) {flat->setHorizonEditing(false); return;}
-        int number = 0;
-        std::unique_ptr<TAbstractDialog> dialog(new TAbstractDialog(nullptr));
-        dialog->AddInput<int>("Номер горизонта", number);
-        if (dialog->Execute() && dialog->ContinuePressed && number >= 0)
-            flat->selectHorizon(static_cast<size_t>(number));
+
+        std::unique_ptr<TForm> picker(new TForm(this));
+        picker->Caption = L"Выбор горизонта для редактирования";
+        picker->BorderStyle = bsDialog;
+        picker->Position = poScreenCenter;
+        picker->ClientWidth = 370;
+        picker->ClientHeight = 380;
+        TTreeView* tree = new TTreeView(picker.get());
+        tree->Parent = picker.get();
+        tree->SetBounds(12, 12, 346, 270);
+        TTreeNode* root = tree->Items->Add(nullptr, L"Горизонты");
+        const auto& horizons = flat->getHorizons();
+        for (size_t i = 0; i < horizons.size(); ++i) {
+            const std::wstring name = horizons[i].name.empty()
+                ? L"Горизонт " + std::to_wstring(i+1) : horizons[i].name;
+            tree->Items->AddChild(root, name.c_str());
+        }
+        TTreeNode* createNode = tree->Items->AddChild(root, L"+ Новый горизонт");
+        root->Expand(true);
+        tree->Selected = horizons.empty() ? createNode : tree->Items->Item[1];
+
+        TLabel* nameLabel = new TLabel(picker.get());
+        nameLabel->Parent = picker.get();
+        nameLabel->SetBounds(12, 292, 340, 20);
+        nameLabel->Caption = L"Имя нового горизонта:";
+        TEdit* nameEdit = new TEdit(picker.get());
+        nameEdit->Parent = picker.get();
+        nameEdit->SetBounds(12, 312, 346, 24);
+        nameEdit->Text = (L"Горизонт " + std::to_wstring(horizons.size()+1)).c_str();
+
+        TButton* accept = new TButton(picker.get());
+        accept->Parent = picker.get();
+        accept->SetBounds(182, 345, 84, 25);
+        accept->Caption = L"Выбрать";
+        accept->ModalResult = mrOk;
+        accept->Default = true;
+        TButton* cancel = new TButton(picker.get());
+        cancel->Parent = picker.get();
+        cancel->SetBounds(274, 345, 84, 25);
+        cancel->Caption = L"Отмена";
+        cancel->ModalResult = mrCancel;
+        cancel->Cancel = true;
+
+        if (picker->ShowModal() != mrOk || !tree->Selected || tree->Selected->Parent != root)
+            return;
+        const size_t index = static_cast<size_t>(tree->Selected->Index);
+        if (tree->Selected == createNode) {
+            const std::wstring name = nameEdit->Text.c_str();
+            flat->selectHorizon(index, name);
+        } else {
+            flat->selectHorizon(index);
+        }
     });
 	addButton("Smooth T", [&](){
 		TAbstractDialog* dialog = new TAbstractDialog(nullptr);
@@ -1006,6 +1079,7 @@ void TWindowContainer::saveVolScreenshot(System::UnicodeString path){
 }
 
 void TWindowContainer::saveScreenshot(System::UnicodeString path){
+    if (rgbChangeTimer && rgbChangeTimer->Enabled) ApplyRgbChannels(nullptr);
 	IFlatWindow* winFlat = dynamic_cast<IFlatWindow*>(window.get());
 	if (!winFlat) {
 		return saveVolScreenshot(path);

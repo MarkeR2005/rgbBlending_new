@@ -40,6 +40,9 @@ private:
     TAxis2* axisYR = new TAxis2(false);
 	TPanel* viewPanel;
     TButton* updateHorizonsButton = nullptr;
+    TTimer* rgbChangeTimer = nullptr;
+    int appliedR = 0, appliedG = 0, appliedB = 0;
+    int pendingR = 0, pendingG = 0, pendingB = 0;
     std::function<void(const std::vector<Horizon>&)> horizonsCallback;
 
 	int posx_ = 0;
@@ -63,6 +66,7 @@ protected:
 
 	void __fastcall Resize(TObject* Sender);
     void __fastcall UpdateHorizonsClick(TObject* Sender);
+    void __fastcall ApplyRgbChannels(TObject* Sender);
 	virtual void __fastcall Loaded();
 
 	void setupCallbacks();

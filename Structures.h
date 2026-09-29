@@ -4,6 +4,7 @@
 #define StructuresH
 #include <vector>
 #include <string>
+#include <utility>
 //---------------------------------------------------------------------------
 static float stnFreqStart = 5;
 static float stnFreqStop = 100;
@@ -27,7 +28,7 @@ struct bitMap
 	std::vector<uint8_t> texture;
 	int height;
 	int width;
-	bitMap(std::vector<uint8_t> texture_ = {}, int height_ = 0, int width_ = 0): texture(texture_), height(height_), width(width_){}
+	bitMap(std::vector<uint8_t> texture_ = {}, int height_ = 0, int width_ = 0): texture(std::move(texture_)), height(height_), width(width_){}
 };
 struct size2
 {
