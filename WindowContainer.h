@@ -61,7 +61,7 @@ private:
 	std::map<TObject*, std::function<void()>> func;
 
     std::function<void(int)> callback = [](int p){};
-    std::function<void(int, int, std::string)> callbackDisp = [](int, int, std::string){};
+    std::function<void(int, int, std::string)> callbackDisp;
 protected:
 	std::unique_ptr<IWindow> window;
 	std::shared_ptr<ColorManager> colorManager = std::make_shared<ColorManager>();

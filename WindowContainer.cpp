@@ -449,6 +449,7 @@ void TWindowContainer::getPos(){
 
 
 void TWindowContainer::scheduleDisplay(double x, double y) {
+    if (!callbackDisp) return;
     pendingMouseX = x;
     pendingMouseY = y;
     displayTimer->Enabled = false;
@@ -456,6 +457,7 @@ void TWindowContainer::scheduleDisplay(double x, double y) {
 }
 void __fastcall TWindowContainer::ApplyDisplayCallback(TObject*) {
     displayTimer->Enabled = false;
+    if (!callbackDisp) return;
     auto* flat = dynamic_cast<FlatWindow*>(window.get());
     if (!flat || !flat->getWindow()) return;
     double mouseX = 0, mouseY = 0;
