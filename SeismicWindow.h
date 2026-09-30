@@ -21,7 +21,8 @@ class SeismicWindow : public FlatWindow
 	//--
 	void initPaletteTexture(const std::array<uint8_t, 256*3>& paletteData);
 	//--
-	void initIndexTexture(const bitMap& texture);
+	void initIndexTexture(bitMap texture);
+    bool getIndex(int x, int y, int& value) const;
 	//--
 	void renderWindow() override;
 	//--
@@ -32,5 +33,6 @@ class SeismicWindow : public FlatWindow
 	GLuint indexTexture = 0;
 	//--
 	GLuint paletteTexture = 0;
+    std::vector<uint8_t> indexPixels;
 };
 #endif

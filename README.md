@@ -12,7 +12,7 @@ The 2D RGB, highlight, horizon and cross-label shaders are embedded in the modul
 
 `Structures.h` defines `Horizon { std::wstring name; std::vector<float> points; }` and `Cross { std::wstring name; int x; }`. Each horizon ordinate corresponds to a trace index; negative or nonfinite ordinates leave a gap. Cross `x` is a trace index. Ordinate values use the same units as the existing horizon editor (sample position multiplied by the window's `dT`).
 
-The existing `CreateRgbBlendingForm(path, callback, callbackDisplay)` entry point remains available. `Export.h` does not include `Structures.h` or expose the internal `Horizon`/`Cross` classes. `RgbHorizons` and `RgbCrosses` are public aliases for vectors of `(name, values)` pairs. The old data-object exports remain available to callers that explicitly include `LegacyDataExports.h`.
+`CreateRgbBlendingForm(path, callback, callbackDisplay)` keeps its export name, but its display callback now takes a third `std::string` parameter. Rebuild dynamic clients with the updated `Export.h`. This header does not include `Structures.h` or expose the internal `Horizon`/`Cross` classes. `RgbHorizons` and `RgbCrosses` are public aliases for vectors of `(name, values)` pairs. The old data-object exports remain available to callers that explicitly include `LegacyDataExports.h`.
 
 For a client that loads the DLL with `GetProcAddress`, include only `Export.h` and use its function pointer typedefs. For example:
 
@@ -43,7 +43,7 @@ void openView(const wchar_t* dllPath, const wchar_t* dataPath, void* userContext
 
     TForm* form = create(System::UnicodeString(dataPath),
         [](int trace) { /* map callback */ },
-        [](int trace, int sample) { /* display callback */ });
+        [](int trace, int sample, std::string info) { /* display callback */ });
     if (!form) {
         FreeLibrary(dll);
         return;
@@ -54,13 +54,18 @@ void openView(const wchar_t* dllPath, const wchar_t* dataPath, void* userContext
     putHorizons(form, horizons);
     putCrosses(form, crosses);
     onHorizons(form, horizonsUpdated, userContext);
+    auto setDisplay = reinterpret_cast<SetDisplayCallbackFn>(
+        GetProcAddress(dll, "setDisplayCallback"));
+    if (setDisplay) setDisplay(form, [](int trace, int sampleTime, std::string info) {
+        /* update the information display */
+    });
     form->Show();
     // Keep dll loaded while form and callbacks are in use.
 }
 ```
 
-An empty vector clears the corresponding list. The **Обновить горизонты** button calls `horizonsUpdated` with a snapshot of all named horizons; edits do not invoke it automatically. `setTraceCallback` and `setDisplayCallback` can be loaded the same way if callbacks need to change after creation. A `false` setter result indicates an invalid form or unsupported view. Since this interface passes VCL and STL types across the DLL boundary, the host and DLL must use compatible C++Builder toolchains and runtimes; keep the DLL loaded for the lifetime of the window.
+An empty vector clears the corresponding list. The **Обновить горизонты** button calls `horizonsUpdated` with a snapshot of all named horizons; edits do not invoke it automatically. `setTraceCallback` and `setDisplayCallback` can be loaded the same way if callbacks need to change after creation. The display callback signature is `void(int trace, int sampleTime, std::string info)`; its third argument is UTF-8. After the mouse stays still for 200 ms, it receives `Ampl: N` for a seismic pixel (the 8-bit index minus 127, giving −127 through 128), `R:N, G:N, B:N` for the currently selected RGB bytes (0 through 255), or `Hor: name` / `Cross: name` over a visible overlay. The map trace callback keeps its original frequency. A `false` setter result indicates an invalid form or unsupported view. Since this interface passes VCL and STL types across the DLL boundary, the host and DLL must use compatible C++Builder toolchains and runtimes; keep the DLL loaded for the lifetime of the window.
 
 The context menu's **Edit horizon (draw with mouse)** action opens a tree of named horizons with an entry for a new horizon. Selecting one starts the existing drag/interpolation interaction. Select the action again to leave editing mode. The new horizon name is entered in the field below the tree. Each name follows the leftmost portion of its horizon currently visible in the viewport, including a segment clipped at the viewport edge. The legacy text, CSV and binary horizon import/export commands still read/write concatenated point arrays; imported horizons receive default names.
 
-Use **View → Horizons (H)** or **View → Crosses (C)**, or press **H**/**C** while the OpenGL view or the VCL form has focus. The checked menu items follow the current visibility. Horizons invert the pixels beneath them once even where two horizons or labels overlap; crosses and their labels are always white.
+Use **View → Horizons (H)** or **View → Crosses (C)**, or press **H**/**C** while the OpenGL view or the VCL form has focus. The checked menu items follow the current visibility. Horizons invert pixels once at intersections and add a black outer stroke so they remain legible on midgray backgrounds. Crosses and their labels are black on seismic sections and white on RGB sections.

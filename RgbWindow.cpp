@@ -43,6 +43,15 @@ void RgbWindow::initData(std::shared_ptr<RgbData> data) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     updateComposite();
 }
+bool RgbWindow::getPixelComponents(int x, int y, int& r, int& g, int& b) const {
+    if (x < 0 || y < 0 || x >= width || y >= height ||
+        compositePixels.size() != static_cast<size_t>(width)*height*3) return false;
+    const size_t index = (static_cast<size_t>(y)*width+x)*3;
+    r = compositePixels[index];
+    g = compositePixels[index+1];
+    b = compositePixels[index+2];
+    return true;
+}
 bool RgbWindow::hasCachedLayers(int r, int g, int b) const {
     const std::array<int, 3> indices = {{r, g, b}};
     for (int index : indices) {

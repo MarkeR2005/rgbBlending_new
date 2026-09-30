@@ -20,7 +20,7 @@ bool __cdecl setTraceCallback(TForm* f, std::function<void(int)> cb) {
     form->setTraceCallback(std::move(cb));
     return true;
 }
-bool __cdecl setDisplayCallback(TForm* f, std::function<void(int, int)> cb) {
+bool __cdecl setDisplayCallback(TForm* f, std::function<void(int, int, std::string)> cb) {
     auto* form = dynamic_cast<TFormUniversal*>(f);
     if (!form || !form->windowContainer) return false;
     form->setDisplayCallback(std::move(cb));
@@ -111,7 +111,7 @@ int getMaxTraceS(SeismicData* data){
 return data->getSize().x;
 }
 
-TForm* __cdecl CreateRgbBlendingForm(System::UnicodeString path, std::function<void(int)> callback, std::function<void(int, int)> callbackDisplay){
+TForm* __cdecl CreateRgbBlendingForm(System::UnicodeString path, std::function<void(int)> callback, std::function<void(int, int, std::string)> callbackDisplay){
 	try {
 		TChoose* choose = new TChoose(Application->MainForm);
 		choose->SetRGBPath(path);

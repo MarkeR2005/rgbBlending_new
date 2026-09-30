@@ -25,6 +25,7 @@ class RgbWindow : public FlatWindow, public IRgbWindow
 	//--
 	void initData(std::shared_ptr<RgbData> data);
     bool hasCachedLayers(int r, int g, int b) const;
+    bool getPixelComponents(int x, int y, int& r, int& g, int& b) const;
 	//--
 	void renderWindow() override;
 

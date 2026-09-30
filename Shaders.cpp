@@ -291,9 +291,10 @@ const char* labelFragment2D = R"GLSL(#version 330 core
 in vec2 TexCoord;
 out vec4 FragColor;
 uniform sampler2D label;
+uniform vec3 textColor;
 void main() {
     if (texture(label, TexCoord).r < 0.35) discard;
-    FragColor = vec4(1.0);
+    FragColor = vec4(textColor, 1.0);
 })GLSL";
 }
 GLuint create2DRgbShaderProgram() {

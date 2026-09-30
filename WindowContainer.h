@@ -41,6 +41,8 @@ private:
 	TPanel* viewPanel;
     TButton* updateHorizonsButton = nullptr;
     TTimer* rgbChangeTimer = nullptr;
+    TTimer* displayTimer = nullptr;
+    double pendingMouseX = 0.0, pendingMouseY = 0.0;
     int appliedR = 0, appliedG = 0, appliedB = 0;
     int pendingR = 0, pendingG = 0, pendingB = 0;
     std::function<void(const std::vector<Horizon>&)> horizonsCallback;
@@ -49,6 +51,8 @@ private:
 	int posy_ = 0;
 
     void getPos();
+    void scheduleDisplay(double x, double y);
+    void __fastcall ApplyDisplayCallback(TObject* Sender);
 
 	void showPopupMenu(int button, int action, int mode);
 
@@ -57,7 +61,7 @@ private:
 	std::map<TObject*, std::function<void()>> func;
 
     std::function<void(int)> callback = [](int p){};
-    std::function<void(int, int)> callbackDisp = [](int p, int s){};
+    std::function<void(int, int, std::string)> callbackDisp = [](int, int, std::string){};
 protected:
 	std::unique_ptr<IWindow> window;
 	std::shared_ptr<ColorManager> colorManager = std::make_shared<ColorManager>();
@@ -79,7 +83,7 @@ protected:
     void createWindow(const std::shared_ptr<IBaseData>& newData, int pos);
 public:
     void setTraceCallback(std::function<void(int)> callback_){callback = callback_;};
-    void setDisplayCallback(std::function<void(int, int)> callback_){callbackDisp = callback_;};
+    void setDisplayCallback(std::function<void(int, int, std::string)> callback_){callbackDisp = callback_;};
     bool setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb);
     bool setHorizons(const std::vector<Horizon>& value);
     bool setCrosses(const std::vector<Cross>& value);

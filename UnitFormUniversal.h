@@ -116,7 +116,7 @@ public:		// User declarations
     void setTraceCallback(std::function<void(int)> callback){
         windowContainer->setTraceCallback(std::move(callback));
     }
-    void setDisplayCallback(std::function<void(int, int)> callback){
+    void setDisplayCallback(std::function<void(int, int, std::string)> callback){
         windowContainer->setDisplayCallback(callback);
     }
 };

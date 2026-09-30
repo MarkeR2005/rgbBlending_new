@@ -48,6 +48,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
     const std::vector<Horizon>& getHorizons() const {return horizons;}
     void setHorizons(const std::vector<Horizon>& value);
     void setCrosses(const std::vector<Cross>& value);
+    std::string hoveredOverlay(double screenX, double screenY) const;
     void setHorizonsVisible(bool value) {showHorizons = value; renderWindow();}
     void setCrossesVisible(bool value) {showCrosses = value; renderWindow();}
     bool horizonsVisible() const {return showHorizons;}
@@ -117,17 +118,20 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	private:
 	size_t horNum = 0;
     bool showHorizons = true, showCrosses = true;
+    bool blackCrosses = false;
     std::vector<Horizon> horizons;
     std::vector<Cross> crosses;
     struct TextLabel { GLuint texture; int width; int height; };
     std::vector<TextLabel> crossLabels, horizonLabels;
+    std::vector<std::pair<float, float>> visibleHorizonAnchors;
     GLuint labelProgram = 0, labelVAO = 0, labelVBO = 0;
     void clearLabels(std::vector<TextLabel>& labels);
     TextLabel makeLabel(const std::wstring& name);
     void updateHorizonLabels();
     void drawLabel(const TextLabel& label, float x, float y);
     void renderCrossLabels();
-    void renderHorizonLabels();
+    void renderHorizonLabels(bool outline = false, float dx = 0.0f, float dy = 0.0f);
+    void updateVisibleHorizonAnchors();
 	std::vector<point2> highlighted_points = {};
 	//static std::vector<FlatWindow*> instances_;
 

@@ -16,6 +16,16 @@ float FlatWindow::staticOffsetX = 0.0f;
 // Clip a horizon segment to the visible pixel rectangle. The first returned
 // endpoint is the leftmost visible point because horizon trace indices increase.
 namespace {
+std::string utf8Name(const std::wstring& value) {
+    if (value.empty()) return {};
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, value.c_str(),
+        static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+    if (bytes <= 0) return {};
+    std::string result(bytes, '\0');
+    WideCharToMultiByte(CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()),
+        &result[0], bytes, nullptr, nullptr);
+    return result;
+}
 bool clipHorizonSegment(float& x0, float& y0, float& x1, float& y1,
                         float viewportWidth, float viewportHeight) {
     const float dx = x1-x0, dy = y1-y0;
@@ -294,35 +304,18 @@ void FlatWindow::renderHighlights()
 void FlatWindow::renderHorizons()
 {
     if (!showHorizons || horizons.empty()) return;
+    updateVisibleHorizonAnchors();
     glUseProgram(horizonProgram);
     glUniform1f(glGetUniformLocation(horizonProgram, "zoom"), zoom);
-    glUniform2f(glGetUniformLocation(horizonProgram, "imageSize"), width, height);
     glUniform2f(glGetUniformLocation(horizonProgram, "offset"), offsetX, offsetY*dT);
     glUniform2f(glGetUniformLocation(horizonProgram, "windowSize"), Wwidth, Wheight);
     glUniform2f(glGetUniformLocation(horizonProgram, "pixelRatio"), pixelRatioX, pixelRatioY);
-    glUniform3f(glGetUniformLocation(horizonProgram, "uColor"), 1.0f, 1.0f, 1.0f);
-    // Only the first horizon fragment at a pixel may invert it. This also
-    // prevents intersections with another horizon or a horizon label from
-    // restoring the original color.
-    glEnable(GL_STENCIL_TEST);
-    glStencilMask(0xFF);
-    glClearStencil(0);
-    glClear(GL_STENCIL_BUFFER_BIT);
-    glStencilFunc(GL_EQUAL, 0, 0xFF);
-    glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
-    glBindVertexArray(VAO1);
-    glLineWidth(3.0f);
+    std::vector<std::vector<float>> segments;
     for (const auto& h : horizons) {
-        // Split on missing ordinates so gaps do not join separate picks.
+        // Build valid strips once for the inverted center and the outer stroke.
         std::vector<float> segment;
         auto flush = [&]() {
-            if (segment.size() >= 4) {
-                glBindBuffer(GL_ARRAY_BUFFER, VBO1);
-                glBufferData(GL_ARRAY_BUFFER, segment.size()*sizeof(float), segment.data(), GL_DYNAMIC_DRAW);
-                glDrawArrays(GL_LINE_STRIP, 0, segment.size()/2);
-            }
+            if (segment.size() >= 4) segments.push_back(std::move(segment));
             segment.clear();
         };
         for (size_t x = 0; x < h.points.size() && x < static_cast<size_t>(width); ++x) {
@@ -332,9 +325,43 @@ void FlatWindow::renderHorizons()
         }
         flush();
     }
+    auto drawLines = [&]() {
+        for (const auto& segment : segments) {
+            glBindBuffer(GL_ARRAY_BUFFER, VBO1);
+            glBufferData(GL_ARRAY_BUFFER, segment.size()*sizeof(float),
+                         segment.data(), GL_DYNAMIC_DRAW);
+            glDrawArrays(GL_LINE_STRIP, 0, segment.size()/2);
+        }
+    };
+    // Invert the original image once, including intersections between horizons
+    // and labels. Reserve these pixels in the stencil before drawing the halo.
+    glEnable(GL_STENCIL_TEST);
+    glStencilMask(0xFF);
+    glClearStencil(0);
+    glClear(GL_STENCIL_BUFFER_BIT);
+    glStencilFunc(GL_EQUAL, 0, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
+    glUniform3f(glGetUniformLocation(horizonProgram, "uColor"), 1.0f, 1.0f, 1.0f);
+    glBindVertexArray(VAO1);
+    glLineWidth(3.0f);
+    drawLines();
     glBindVertexArray(0);
-    glDisable(GL_BLEND);
     renderHorizonLabels();
+    // Black outer stroke remains visible when inversion has little contrast
+    // on midgray pixels. The stencil preserves the inverted inner stroke.
+    glDisable(GL_BLEND);
+    glUseProgram(horizonProgram);
+    glUniform3f(glGetUniformLocation(horizonProgram, "uColor"), 0.0f, 0.0f, 0.0f);
+    glBindVertexArray(VAO1);
+    glLineWidth(7.0f);
+    drawLines();
+    glBindVertexArray(0);
+    renderHorizonLabels(true, -1.0f, 0.0f);
+    renderHorizonLabels(true,  1.0f, 0.0f);
+    renderHorizonLabels(true, 0.0f, -1.0f);
+    renderHorizonLabels(true, 0.0f,  1.0f);
     glDisable(GL_STENCIL_TEST);
 }
 void FlatWindow::renderCrosses()
@@ -345,7 +372,9 @@ void FlatWindow::renderCrosses()
     glUniform2f(glGetUniformLocation(horizonProgram, "offset"), offsetX, offsetY*dT);
     glUniform2f(glGetUniformLocation(horizonProgram, "windowSize"), Wwidth, Wheight);
     glUniform2f(glGetUniformLocation(horizonProgram, "pixelRatio"), pixelRatioX, pixelRatioY);
-    glUniform3f(glGetUniformLocation(horizonProgram, "uColor"), 1.0f, 1.0f, 1.0f);
+    const float crossColor = blackCrosses ? 0.0f : 1.0f;
+    glUniform3f(glGetUniformLocation(horizonProgram, "uColor"),
+                crossColor, crossColor, crossColor);
     glDisable(GL_BLEND);
     glBindVertexArray(VAO1);
     glLineWidth(2.0f);
@@ -376,6 +405,9 @@ void FlatWindow::renderCrossLabels() {
     glUseProgram(labelProgram);
     glUniform2f(glGetUniformLocation(labelProgram, "windowSize"), Wwidth, Wheight);
     glUniform1i(glGetUniformLocation(labelProgram, "label"), 0);
+    const float crossColor = blackCrosses ? 0.0f : 1.0f;
+    glUniform3f(glGetUniformLocation(labelProgram, "textColor"),
+                crossColor, crossColor, crossColor);
     glDisable(GL_BLEND);
     glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(labelVAO);
@@ -386,19 +418,13 @@ void FlatWindow::renderCrossLabels() {
     glBindVertexArray(0);
     glDisable(GL_BLEND);
 }
-void FlatWindow::renderHorizonLabels() {
+void FlatWindow::updateVisibleHorizonAnchors() {
+    visibleHorizonAnchors.assign(horizons.size(), {static_cast<float>(Wwidth)+1.0f, 0.0f});
     if (Wwidth <= 0 || Wheight <= 0 || zoom <= 0 || pixelRatioX <= 0 || pixelRatioY <= 0) return;
-    glUseProgram(labelProgram);
-    glUniform2f(glGetUniformLocation(labelProgram, "windowSize"), Wwidth, Wheight);
-    glUniform1i(glGetUniformLocation(labelProgram, "label"), 0);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
-    glActiveTexture(GL_TEXTURE0);
-    glBindVertexArray(labelVAO);
     const int left = std::max(0, static_cast<int>(std::floor(offsetX)) - 1);
     const int right = std::min(width - 1,
         static_cast<int>(std::ceil(offsetX + Wwidth*pixelRatioX/zoom)) + 1);
-    for (size_t i = 0; i < horizons.size() && i < horizonLabels.size(); ++i) {
+    for (size_t i = 0; i < horizons.size(); ++i) {
         const auto& points = horizons[i].points;
         const int last = std::min(right, static_cast<int>(points.size()) - 1);
         float anchorX = static_cast<float>(Wwidth) + 1, anchorY = 0;
@@ -418,10 +444,28 @@ void FlatWindow::renderHorizonLabels() {
                 anchorY = sy;
             }
         }
-        if (anchorX < Wwidth) {
-            drawLabel(horizonLabels[i], anchorX+3.0f,
-                std::max(0.0f, anchorY-horizonLabels[i].height-4.0f));
-        }
+        visibleHorizonAnchors[i] = {anchorX, anchorY};
+    }
+}
+void FlatWindow::renderHorizonLabels(bool outline, float dx, float dy) {
+    if (Wwidth <= 0 || Wheight <= 0 || zoom <= 0 || pixelRatioX <= 0 || pixelRatioY <= 0) return;
+    glUseProgram(labelProgram);
+    glUniform2f(glGetUniformLocation(labelProgram, "windowSize"), Wwidth, Wheight);
+    glUniform1i(glGetUniformLocation(labelProgram, "label"), 0);
+    const float color = outline ? 0.0f : 1.0f;
+    glUniform3f(glGetUniformLocation(labelProgram, "textColor"), color, color, color);
+    if (outline) glDisable(GL_BLEND);
+    else {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ZERO);
+    }
+    glActiveTexture(GL_TEXTURE0);
+    glBindVertexArray(labelVAO);
+    for (size_t i = 0; i < visibleHorizonAnchors.size() && i < horizonLabels.size(); ++i) {
+        const auto& anchor = visibleHorizonAnchors[i];
+        if (anchor.first < Wwidth)
+            drawLabel(horizonLabels[i], anchor.first+3.0f+dx,
+                std::max(0.0f, anchor.second-horizonLabels[i].height-4.0f)+dy);
     }
     glBindVertexArray(0);
     glDisable(GL_BLEND);
@@ -467,6 +511,44 @@ void FlatWindow::updateHorizonLabels() {
     for (const auto& horizon : horizons) {
         horizonLabels.push_back(makeLabel(horizon.name));
     }
+}
+std::string FlatWindow::hoveredOverlay(double screenX, double screenY) const {
+    if (zoom <= 0 || pixelRatioX <= 0 || pixelRatioY <= 0) return {};
+    const double trace = screenX*pixelRatioX/zoom+offsetX;
+    // Compare in screen pixels so the hover tolerance stays the same at any zoom.
+    if (showHorizons) {
+        const int left = std::max(0, static_cast<int>(std::floor(trace))-1);
+        for (const auto& horizon : horizons) {
+            const int right = std::min(std::min(width-1, static_cast<int>(horizon.points.size())-1),
+                                       static_cast<int>(std::ceil(trace))+1);
+            for (int x = left; x <= right; ++x) {
+                const float ordinate = horizon.points[x];
+                if (!std::isfinite(ordinate) || ordinate < 0) continue;
+                const double sx = (x-offsetX)*zoom/pixelRatioX;
+                const double sy = (ordinate-offsetY*dT)*zoom/pixelRatioY;
+                double distance2 = (screenX-sx)*(screenX-sx)+(screenY-sy)*(screenY-sy);
+                if (x < right && std::isfinite(horizon.points[x+1]) && horizon.points[x+1] >= 0) {
+                    const double ex = (x+1-offsetX)*zoom/pixelRatioX;
+                    const double ey = (horizon.points[x+1]-offsetY*dT)*zoom/pixelRatioY;
+                    const double dx = ex-sx, dy = ey-sy;
+                    const double fraction = std::max(0.0, std::min(1.0,
+                        ((screenX-sx)*dx+(screenY-sy)*dy)/(dx*dx+dy*dy)));
+                    const double nearX = sx+fraction*dx, nearY = sy+fraction*dy;
+                    distance2 = std::min(distance2,
+                        (screenX-nearX)*(screenX-nearX)+(screenY-nearY)*(screenY-nearY));
+                }
+                if (distance2 <= 25.0) return "Hor: " + utf8Name(horizon.name);
+            }
+        }
+    }
+    if (showCrosses) {
+        for (const auto& cross : crosses) {
+            if (cross.x < 0 || cross.x >= width) continue;
+            const double sx = (cross.x-offsetX)*zoom/pixelRatioX;
+            if (std::abs(screenX-sx) <= 4.0) return "Cross: " + utf8Name(cross.name);
+        }
+    }
+    return {};
 }
 void FlatWindow::setCrosses(const std::vector<Cross>& value) {
     crosses = value;

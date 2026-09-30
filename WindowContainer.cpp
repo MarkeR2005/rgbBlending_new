@@ -16,6 +16,7 @@
 #include <Vcl.ComCtrls.hpp>
 #include <thread>
 #include <chrono>
+#include <cmath>
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 
@@ -42,6 +43,10 @@ __fastcall TWindowContainer::TWindowContainer(TComponent* Owner) : TPanel(Owner)
     rgbChangeTimer->Enabled = false;
     rgbChangeTimer->Interval = 250;
     rgbChangeTimer->OnTimer = ApplyRgbChannels;
+    displayTimer = new TTimer(this);
+    displayTimer->Enabled = false;
+    displayTimer->Interval = 200;
+    displayTimer->OnTimer = ApplyDisplayCallback;
 
 	image1 = new TImage(this);
 	image1->Height = 1440;
@@ -205,6 +210,7 @@ void __fastcall TWindowContainer::UpdateHorizonsClick(TObject*) {
 }
 void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
     rgbChangeTimer->Enabled = false;
+    displayTimer->Enabled = false;
     appliedR = appliedG = appliedB = pendingR = pendingG = pendingB = 0;
 	if (!data->getCM()) {
 		data->setCM(colorManager);
@@ -330,6 +336,7 @@ float TWindowContainer::getFreqByIndex(int idx){
 
 __fastcall TWindowContainer::~TWindowContainer(){
     if (rgbChangeTimer) rgbChangeTimer->Enabled = false;
+    if (displayTimer) displayTimer->Enabled = false;
     auto it = std::find(instances_.begin(), instances_.end(), this);
     if (it != instances_.end()) {
         instances_.erase(it);
@@ -428,14 +435,67 @@ void TWindowContainer::getPos(){
 		auto sData = std::dynamic_pointer_cast<SeismicData>(dataContainer);
 		if (sData) {
 			if (sData->getType() == DataType::SWAN || sData->getType() == DataType::EN_SWAN) {
-				PosInfo->Caption = (std::to_string(sData->getFreq()[posx_]) + ";" + std::to_string(posy_)).c_str();
-				return;
+                const auto& frequencies = sData->getFreqRef();
+                if (posx_ >= 0 && posx_ < static_cast<int>(frequencies.size())) {
+                    PosInfo->Caption = (std::to_string(frequencies[posx_]) + ";" +
+                                        std::to_string(posy_)).c_str();
+                    return;
+                }
 			}
 		}
 		PosInfo->Caption = (std::to_string(posx_) + ";" + std::to_string(posy_)).c_str();
 	}
 }
 
+
+void TWindowContainer::scheduleDisplay(double x, double y) {
+    pendingMouseX = x;
+    pendingMouseY = y;
+    displayTimer->Enabled = false;
+    displayTimer->Enabled = true;
+}
+void __fastcall TWindowContainer::ApplyDisplayCallback(TObject*) {
+    displayTimer->Enabled = false;
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat || !flat->getWindow()) return;
+    double mouseX = 0, mouseY = 0;
+    glfwGetCursorPos(flat->getWindow(), &mouseX, &mouseY);
+    if (std::abs(mouseX-pendingMouseX) > 0.5 || std::abs(mouseY-pendingMouseY) > 0.5) {
+        scheduleDisplay(mouseX, mouseY);
+        return;
+    }
+    int winWidth = 0, winHeight = 0, fbWidth = 0, fbHeight = 0;
+    glfwGetWindowSize(flat->getWindow(), &winWidth, &winHeight);
+    glfwGetFramebufferSize(flat->getWindow(), &fbWidth, &fbHeight);
+    if (winWidth <= 0 || winHeight <= 0 || mouseX < 0 || mouseY < 0 ||
+        mouseX >= winWidth || mouseY >= winHeight) return;
+    const double screenX = mouseX*fbWidth/winWidth;
+    const double screenY = mouseY*fbHeight/winHeight;
+    float ratioX, ratioY, offsetX, offsetY;
+    flat->getRatio(ratioX, ratioY);
+    flat->getOffset(offsetX, offsetY);
+    const float zoom = flat->getZoom(), dT = flat->getDT();
+    if (zoom <= 0 || dT <= 0 || ratioX <= 0 || ratioY <= 0) return;
+    const int x = static_cast<int>(std::floor(screenX*ratioX/zoom+offsetX));
+    const int y = static_cast<int>(std::floor(screenY*ratioY/zoom/dT+offsetY));
+    int width, height;
+    flat->getSize(width, height);
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    std::string info = flat->hoveredOverlay(screenX, screenY);
+    if (info.empty()) {
+        if (auto* seismic = dynamic_cast<SeismicWindow*>(window.get())) {
+            int index = 0;
+            if (!seismic->getIndex(x, y, index)) return;
+            info = "Ampl: " + std::to_string(index-127);
+        } else if (auto* rgb = dynamic_cast<RgbWindow*>(window.get())) {
+            int r = 0, g = 0, b = 0;
+            if (!rgb->getPixelComponents(x, y, r, g, b)) return;
+            info = "R:" + std::to_string(r) + ", G:" + std::to_string(g) +
+                   ", B:" + std::to_string(b);
+        } else return;
+    }
+    callbackDisp(x, static_cast<int>(y*dT), info);
+}
 
 void TWindowContainer::setupCallbacks()
 {
@@ -451,6 +511,7 @@ void TWindowContainer::setupCallbacks()
 				}
 				updateAxis(true);});
 			winCall->setCursorPosCallback([this](double ox, double oy){
+                scheduleDisplay(ox, oy);
 			if (syncButton->Checked) {
 					TWindowContainer::emitToAll();
 					return;
@@ -458,9 +519,6 @@ void TWindowContainer::setupCallbacks()
 				updateAxis(false);
                 getPos();
                 callback(posx_);
-                IFlatWindow* flatWin = dynamic_cast<IFlatWindow*>(window.get());
-                float dT = flatWin->getDT();
-                callbackDisp(posx_, posy_*dT);
                 });
 		break;
 		case WindowType::RGB:
@@ -472,6 +530,7 @@ void TWindowContainer::setupCallbacks()
 				}
 				updateAxis(true);});
 			winCall->setCursorPosCallback([this](double ox, double oy){
+                scheduleDisplay(ox, oy);
 			if (syncButton->Checked) {
 					emitToAll();
 					return;
@@ -479,9 +538,6 @@ void TWindowContainer::setupCallbacks()
 				updateAxis(false);
                 getPos();
                 callback(posx_);
-                IFlatWindow* flatWin = dynamic_cast<IFlatWindow*>(window.get());
-                float dT = flatWin->getDT();
-                callbackDisp(posx_, posy_*dT);
                 });
 		break;
 		case WindowType::VOL:
@@ -490,6 +546,10 @@ void TWindowContainer::setupCallbacks()
 		default:
 		throw;
 		}
+        if (type == WindowType::SEIS || type == WindowType::RGB)
+            winCall->setCursorEnterCallback([this](int entered) {
+                if (!entered) displayTimer->Enabled = false;
+            });
 	}
 }
 

@@ -59,6 +59,7 @@ public:
 	DataType getType() {return type;};
 	bitMap getTexture();
     std::vector<float> getFreq(){return freq;};
+    const std::vector<float>& getFreqRef() const {return freq;}
 	//Derivative data
 	//File
 	void saveFile(const std::wstring& loc);

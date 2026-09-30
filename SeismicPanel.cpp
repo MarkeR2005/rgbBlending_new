@@ -68,7 +68,7 @@ void TSeismicPanel::setData(std::shared_ptr<SeismicData> data){
 	getWindow()->initPaletteTexture(PALETTE);
 	getWindow()->setDT(data->getDT()/1000.0f);
 	bitMap bm = getContainer()->getTexture();
-	getWindow()->initIndexTexture(bm);
+	getWindow()->initIndexTexture(std::move(bm));
 	if (data->getSize().x == 1) {
         window->isThin = true;
 	}
