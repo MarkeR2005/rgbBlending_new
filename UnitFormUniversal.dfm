@@ -12,6 +12,8 @@ object FormUniversal: TFormUniversal
   Font.Style = []
   Menu = MainMenu1
   OnClose = FormClose
+  KeyPreview = True
+  OnKeyDown = FormKeyDown
   TextHeight = 15
   object Panel1: TPanel
     Left = 0
@@ -241,6 +243,16 @@ object FormUniversal: TFormUniversal
     end
     object View1: TMenuItem
       Caption = 'View'
+      object ShowHorizons: TMenuItem
+        Caption = 'Horizons (H)'
+        Checked = True
+        OnClick = ShowHorizonsClick
+      end
+      object ShowCrosses: TMenuItem
+        Caption = 'Crosses (C)'
+        Checked = True
+        OnClick = ShowCrossesClick
+      end
       object ContrastBar: TMenuItem
         Caption = 'ContrastBar'
         OnClick = ContrastBarClick

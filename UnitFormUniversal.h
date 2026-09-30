@@ -57,6 +57,8 @@ __published:	// IDE-managed Components
 	TMenuItem *SetRatio1;
 	TMenuItem *SaveScreenShot1;
 	TMenuItem *RightAxe;
+	TMenuItem *ShowHorizons;
+	TMenuItem *ShowCrosses;
 	void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
 	void __fastcall OpenAsClick(TObject *Sender);
 	void __fastcall ScrollBar1Change(TObject *Sender);
@@ -74,8 +76,13 @@ __published:	// IDE-managed Components
 	void __fastcall SetRatio1Click(TObject *Sender);
 	void __fastcall SaveScreenShot1Click(TObject *Sender);
 	void __fastcall RightAxeClick(TObject *Sender);
+	void __fastcall ShowHorizonsClick(TObject *Sender);
+	void __fastcall ShowCrossesClick(TObject *Sender);
+	void __fastcall FormKeyDown(TObject *Sender, WORD &Key, TShiftState Shift);
 private:	// User declarations
     System::UnicodeString path = "";
+    TTimer* overlayEventsTimer = nullptr;
+    void __fastcall PollOverlayEvents(TObject *Sender);
 public:		// User declarations
 	TWindowContainer* windowContainer = nullptr;
     System::UnicodeString getPath() {return path;};

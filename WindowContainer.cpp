@@ -177,6 +177,25 @@ bool TWindowContainer::setCrosses(const std::vector<Cross>& value) {
     flat->setCrosses(value);
     return true;
 }
+bool TWindowContainer::getOverlayVisibility(bool& showH, bool& showC) const {
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat) return false;
+    showH = flat->horizonsVisible();
+    showC = flat->crossesVisible();
+    return true;
+}
+void TWindowContainer::toggleHorizons() {
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (flat) flat->setHorizonsVisible(!flat->horizonsVisible());
+}
+void TWindowContainer::toggleCrosses() {
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (flat) flat->setCrossesVisible(!flat->crossesVisible());
+}
+void TWindowContainer::pollOverlayEvents() {
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (flat && flat->getWindow()) glfwPollEvents();
+}
 void __fastcall TWindowContainer::UpdateHorizonsClick(TObject*) {
     FlatWindow* flat = dynamic_cast<FlatWindow*>(window.get());
     if (flat && horizonsCallback) {

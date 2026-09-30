@@ -33,11 +33,18 @@ __fastcall TFormUniversal::TFormUniversal(TComponent* Owner, System::UnicodeStri
 	windowContainer = new TWindowContainer(this);
 	windowContainer->Parent = this;
 	windowContainer->Align = alClient;
+    ShowHorizons->Enabled = false;
+    ShowCrosses->Enabled = false;
+    overlayEventsTimer = new TTimer(this);
+    overlayEventsTimer->Interval = 30;
+    overlayEventsTimer->OnTimer = PollOverlayEvents;
+    overlayEventsTimer->Enabled = true;
 	OnClose=FormClose;
 }
 //---------------------------------------------------------------------------
 void __fastcall TFormUniversal::FormClose(TObject *Sender, TCloseAction &Action)
 {
+if (overlayEventsTimer) overlayEventsTimer->Enabled = false;
 Free();
 }
 //---------------------------------------------------------------------------
@@ -341,3 +348,34 @@ void __fastcall TFormUniversal::RightAxeClick(TObject *Sender)
 //---------------------------------------------------------------------------
 
 
+
+void __fastcall TFormUniversal::PollOverlayEvents(TObject*) {
+    if (!windowContainer) return;
+    windowContainer->pollOverlayEvents();
+    bool horizons = false, crosses = false;
+    const bool available = windowContainer->getOverlayVisibility(horizons, crosses);
+    ShowHorizons->Enabled = available;
+    ShowCrosses->Enabled = available;
+    if (available) {
+        ShowHorizons->Checked = horizons;
+        ShowCrosses->Checked = crosses;
+    }
+}
+void __fastcall TFormUniversal::ShowHorizonsClick(TObject*) {
+    if (windowContainer) windowContainer->toggleHorizons();
+    PollOverlayEvents(nullptr);
+}
+void __fastcall TFormUniversal::ShowCrossesClick(TObject*) {
+    if (windowContainer) windowContainer->toggleCrosses();
+    PollOverlayEvents(nullptr);
+}
+void __fastcall TFormUniversal::FormKeyDown(TObject*, WORD &Key, TShiftState Shift) {
+    if (Shift.Contains(ssCtrl) || Shift.Contains(ssAlt)) return;
+    if (Key == 'H' && ShowHorizons->Enabled) {
+        ShowHorizonsClick(nullptr);
+        Key = 0;
+    } else if (Key == 'C' && ShowCrosses->Enabled) {
+        ShowCrossesClick(nullptr);
+        Key = 0;
+    }
+}

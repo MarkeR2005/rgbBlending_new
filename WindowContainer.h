@@ -83,6 +83,10 @@ public:
     bool setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb);
     bool setHorizons(const std::vector<Horizon>& value);
     bool setCrosses(const std::vector<Cross>& value);
+    bool getOverlayVisibility(bool& showH, bool& showC) const;
+    void toggleHorizons();
+    void toggleCrosses();
+    void pollOverlayEvents();
 	static std::vector<TWindowContainer*> instances_;
 	int getFreqSize();
     float getFreqByIndex(int idx);

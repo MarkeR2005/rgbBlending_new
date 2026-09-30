@@ -50,6 +50,8 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
     void setCrosses(const std::vector<Cross>& value);
     void setHorizonsVisible(bool value) {showHorizons = value; renderWindow();}
     void setCrossesVisible(bool value) {showCrosses = value; renderWindow();}
+    bool horizonsVisible() const {return showHorizons;}
+    bool crossesVisible() const {return showCrosses;}
     void setHorizonEditing(bool value) {isDrawing = value; firstPoint = true;}
     bool horizonEditing() const {return isDrawing;}
     void selectHorizon(size_t index, const std::wstring& name = L"");
@@ -119,7 +121,6 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
     std::vector<Cross> crosses;
     struct TextLabel { GLuint texture; int width; int height; };
     std::vector<TextLabel> crossLabels, horizonLabels;
-    std::vector<int> firstHorizonPoints;
     GLuint labelProgram = 0, labelVAO = 0, labelVBO = 0;
     void clearLabels(std::vector<TextLabel>& labels);
     TextLabel makeLabel(const std::wstring& name);
