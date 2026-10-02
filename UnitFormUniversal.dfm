@@ -288,10 +288,6 @@ object FormUniversal: TFormUniversal
         Visible = False
         OnClick = Changeshader1Click
       end
-      object SetRatio1: TMenuItem
-        Caption = 'SetRatio'
-        OnClick = SetRatio1Click
-      end
     end
   end
   object OpenDialog1: TOpenDialog

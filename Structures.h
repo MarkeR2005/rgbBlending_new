@@ -3,6 +3,7 @@
 #ifndef StructuresH
 #define StructuresH
 #include <vector>
+#include <cstdint>
 #include <string>
 #include <utility>
 //---------------------------------------------------------------------------
@@ -14,10 +15,14 @@ static int stnXWindow = 5;
 static int stnTWindow = 5;
 static int stnFWindow = 5;
 static float stnFilterFreq = 15;
-// One ordinate per trace; negative values mean no picked point.
+// One ordinate per trace; exactly -1 means no picked point.
 struct Horizon {
     std::wstring name;
     std::vector<float> points;
+    // Local appearance. Existing host transfer data still contains name/points.
+    bool useColor = false;
+    bool contrast = true;
+    unsigned char red = 255, green = 255, blue = 255;
 };
 struct Cross {
     std::wstring name;

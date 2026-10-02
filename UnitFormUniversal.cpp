@@ -281,17 +281,6 @@ void __fastcall TFormUniversal::TopAxeClick(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 
-void __fastcall TFormUniversal::SetRatio1Click(TObject *Sender)
-{
-	if (windowContainer==nullptr) {
-		return;
-	}
-    windowContainer->setRatio();
-}
-//---------------------------------------------------------------------------
-
-//---------------------------------------------------------------------------
-
 void __fastcall TFormUniversal::Changepalette1Click(TObject *Sender)
 {
 	if (windowContainer==nullptr) {

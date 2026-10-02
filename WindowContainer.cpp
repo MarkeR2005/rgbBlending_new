@@ -14,6 +14,7 @@
 #include "SeismicPlane.h"
 #include "RgbPlane.h"
 #include <Vcl.ComCtrls.hpp>
+#include <Vcl.Dialogs.hpp>
 #include <thread>
 #include <chrono>
 #include <cmath>
@@ -80,6 +81,36 @@ __fastcall TWindowContainer::TWindowContainer(TComponent* Owner) : TPanel(Owner)
 	image4 ->Visible = false;
 	image4 ->Enabled = false;
 
+    ratioPanel = new TPanel(this);
+    ratioPanel->Parent = this;
+    ratioPanel->SetBounds(0, Height-50, 255, 50);
+    ratioPanel->BevelOuter = bvNone;
+    ratioPanel->Color = clInfoBk;
+    ratioPanel->Visible = false;
+    ratioXLabel = new TLabel(this);
+    ratioXLabel->Parent = ratioPanel;
+    ratioXLabel->SetBounds(3, 3, 62, 19);
+    ratioXLabel->Caption = L"X 1.00";
+    ratioYLabel = new TLabel(this);
+    ratioYLabel->Parent = ratioPanel;
+    ratioYLabel->SetBounds(3, 26, 62, 19);
+    ratioYLabel->Caption = L"T 1.00";
+    ratioXSlider = new TTrackBar(this);
+    ratioXSlider->Parent = ratioPanel;
+    ratioXSlider->SetBounds(68, 0, 185, 23);
+    ratioXSlider->Min = -10; ratioXSlider->Max = 10;
+    ratioXSlider->Position = 0;
+    ratioXSlider->TickStyle = tsNone;
+    ratioXSlider->OnChange = RatioChange;
+    ratioYSlider = new TTrackBar(this);
+    ratioYSlider->Parent = ratioPanel;
+    ratioYSlider->SetBounds(68, 23, 185, 23);
+    ratioYSlider->Min = -10; ratioYSlider->Max = 10;
+    ratioYSlider->Position = 0;
+    ratioYSlider->TickStyle = tsNone;
+    ratioYSlider->OnChange = RatioChange;
+    ratioPanel->BringToFront();
+
 	axisY->createAxe(0, 100, viewPanel->Height, 3);
 	image1->Canvas->Brush->Color = clInfoBk;
 	image1->Canvas->FillRect(Rect(0, 0, viewPanel->Width, viewPanel->Height));
@@ -108,6 +139,10 @@ __fastcall TWindowContainer::TWindowContainer(TComponent* Owner) : TPanel(Owner)
 	syncButton->Caption = "Sync";
 	FPopupMenu->Items->Add(syncButton);
     syncButton->OnClick = LockClick;
+    horizonStyleMenu = new TMenuItem(FPopupMenu);
+    horizonStyleMenu->Caption = L"Horizon colors";
+    horizonStyleMenu->Visible = false;
+    FPopupMenu->Items->Add(horizonStyleMenu);
 
 	instances_.push_back(this);
 
@@ -254,6 +289,8 @@ void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
     image3 ->Enabled = true;
     image4 ->Visible = true;
     image4 ->Enabled = true;
+    ratioPanel->Visible = true;
+    ratioPanel->BringToFront();
 	dataContainer = data;
     updateHorizonsButton->Visible = true;
     setupCallbacks();
@@ -281,6 +318,7 @@ void TWindowContainer::initialize(){
 	window = std::move(window_);
 	type = WindowType::VOL;
     updateHorizonsButton->Visible = false;
+    ratioPanel->Visible = false;
 	syncButton->Enabled=false;
     syncButton->Visible=false;
 	setupCallbacks();
@@ -351,6 +389,7 @@ __fastcall TWindowContainer::~TWindowContainer(){
 
 
 void __fastcall TWindowContainer::Resize(TObject* Sender){
+    if (ratioPanel) ratioPanel->Top = Height-ratioPanel->Height;
 	if (!window) {
 		return;
     }
@@ -391,20 +430,65 @@ void TWindowContainer::setViewParams(viewParams params){
         window->renderWindow();
     }
 }
-void TWindowContainer::setRatio(){
-	FlatWindow* wd1 = dynamic_cast<FlatWindow*>(window.get());
-	if (wd1 != nullptr) {
-		float rx = 1.0f;
-		float ry = 1.0f;
-		TAbstractDialog* dialog = new TAbstractDialog(nullptr);
-		dialog->AddInput<float>("—жатие по X", rx);
-		dialog->AddInput<float>("—жатие по T", ry);
-		if (dialog->Execute() && dialog->ContinuePressed) {
-		wd1->setRatio(rx,ry);
-        updateAxis(true);
-		}
-	}
-    window->renderWindow();
+void __fastcall TWindowContainer::RatioChange(TObject*) {
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat || !ratioXSlider || !ratioYSlider) return;
+    const float rx = std::pow(10.0f, ratioXSlider->Position/10.0f);
+    const float ry = std::pow(10.0f, ratioYSlider->Position/10.0f);
+    ratioXLabel->Caption = (L"X " + std::to_wstring(rx).substr(0, 4)).c_str();
+    ratioYLabel->Caption = (L"T " + std::to_wstring(ry).substr(0, 4)).c_str();
+    flat->setRatio(rx, ry);
+    flat->resizeWindow(viewPanel->Width, viewPanel->Height);
+    updateAxis(true);
+    flat->renderWindow();
+}
+
+void TWindowContainer::rebuildHorizonStyleMenu() {
+    if (!horizonStyleMenu) return;
+    for (auto* action : horizonStyleActions) func.erase(action);
+    horizonStyleActions.clear();
+    horizonStyleMenu->Clear();
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat) {horizonStyleMenu->Visible = false; return;}
+    horizonStyleMenu->Visible = true;
+    const auto& horizons = flat->getHorizons();
+    horizonStyleMenu->Enabled = !horizons.empty();
+    for (size_t i = 0; i < horizons.size(); ++i) {
+        const auto& horizon = horizons[i];
+        TMenuItem* sub = new TMenuItem(horizonStyleMenu);
+        sub->Caption = horizon.name.empty() ?
+            (L"Horizon " + std::to_wstring(i+1)).c_str() : horizon.name.c_str();
+        horizonStyleMenu->Add(sub);
+        auto addAction = [&](const wchar_t* caption, bool checked, std::function<void()> fn) {
+            TMenuItem* item = new TMenuItem(sub);
+            item->Caption = caption;
+            item->Checked = checked;
+            sub->Add(item);
+            func[item] = std::move(fn);
+            horizonStyleActions.push_back(item);
+            item->OnClick = useFunction;
+        };
+        addAction(L"Choose color...", horizon.useColor, [this, i]() {
+            auto* current = dynamic_cast<FlatWindow*>(window.get());
+            if (!current || i >= current->getHorizons().size()) return;
+            std::unique_ptr<TColorDialog> dialog(new TColorDialog(this));
+            const auto& h = current->getHorizons()[i];
+            dialog->Color = static_cast<TColor>(RGB(h.red, h.green, h.blue));
+            if (dialog->Execute()) {
+                const COLORREF c = ColorToRGB(dialog->Color);
+                current->setHorizonColor(i, GetRValue(c), GetGValue(c), GetBValue(c));
+            }
+        });
+        addAction(L"Negative (default)", !horizon.useColor, [this, i]() {
+            if (auto* current = dynamic_cast<FlatWindow*>(window.get())) current->setHorizonNegative(i);
+        });
+        addAction(L"Contrast outline", horizon.contrast, [this, i]() {
+            if (auto* current = dynamic_cast<FlatWindow*>(window.get())) {
+                if (i < current->getHorizons().size())
+                    current->setHorizonContrast(i, !current->getHorizons()[i].contrast);
+            }
+        });
+    }
 }
 
 void TWindowContainer::showPopupMenu(int button, int action, int mode)
@@ -413,6 +497,7 @@ void TWindowContainer::showPopupMenu(int button, int action, int mode)
 		POINT pt;
 		GetCursorPos(&pt);
         getPos();
+        rebuildHorizonStyleMenu();
 		PopupMenu->Popup(pt.x, pt.y);
 	}
 }

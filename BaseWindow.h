@@ -56,6 +56,9 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
     void setHorizonEditing(bool value) {isDrawing = value; firstPoint = true;}
     bool horizonEditing() const {return isDrawing;}
     void selectHorizon(size_t index, const std::wstring& name = L"");
+    bool setHorizonColor(size_t index, unsigned char r, unsigned char g, unsigned char b);
+    bool setHorizonNegative(size_t index);
+    bool setHorizonContrast(size_t index, bool value);
 	float getDT() override {return dT;};
 	//Setters
 	virtual void setOffset(float ox, float oy) override {offsetX = ox;offsetY = oy;};
@@ -151,11 +154,13 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	//--
 
 	bool isDragging = false;
+    bool eraseStroke = false;
 	//--
 	double lastMouseX = 0.0;
 	//--
 	double lastMouseY = 0.0;
-    int lastPosX = 0, lastPosY = 0;
+    int lastPosX = 0;
+    float lastPosY = 0.0f;
     	//--
 	float contrast = 1.0f;
 

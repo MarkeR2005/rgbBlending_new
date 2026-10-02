@@ -5,6 +5,7 @@
 #include "axis.h"
 #include "Shaders.h"
 #include "Structures.h"
+#include <Vcl.ComCtrls.hpp>
 
 #ifndef WindowContainerH
 #define WindowContainerH
@@ -33,6 +34,13 @@ private:
 	TImage* image2;
     TImage* image3;
     TImage* image4;
+    TPanel* ratioPanel = nullptr;
+    TTrackBar* ratioXSlider = nullptr;
+    TTrackBar* ratioYSlider = nullptr;
+    TLabel* ratioXLabel = nullptr;
+    TLabel* ratioYLabel = nullptr;
+    TMenuItem* horizonStyleMenu = nullptr;
+    std::vector<TObject*> horizonStyleActions;
 
 	WindowType type = WindowType::NONE;
 	TAxis2* axis = new TAxis2(false);
@@ -53,6 +61,8 @@ private:
     void getPos();
     void scheduleDisplay(double x, double y);
     void __fastcall ApplyDisplayCallback(TObject* Sender);
+    void __fastcall RatioChange(TObject* Sender);
+    void rebuildHorizonStyleMenu();
 
 	void showPopupMenu(int button, int action, int mode);
 
@@ -98,7 +108,6 @@ public:
 	TPopupMenu *FPopupMenu = new TPopupMenu(this);
 	void updateAxis(bool reEval);
 	static void __fastcall emitToAll();
-    void setRatio();
 	void __fastcall LockClick(TObject* Sender);
 	__fastcall TWindowContainer(TComponent* Owner);
 	__fastcall ~TWindowContainer();

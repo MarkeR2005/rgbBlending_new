@@ -54,7 +54,6 @@ __published:	// IDE-managed Components
 	TMenuItem *TopAxe;
 	TMenuItem *Changepalette1;
 	TMenuItem *Changeshader1;
-	TMenuItem *SetRatio1;
 	TMenuItem *SaveScreenShot1;
 	TMenuItem *RightAxe;
 	TMenuItem *ShowHorizons;
@@ -73,7 +72,6 @@ __published:	// IDE-managed Components
 	void __fastcall TopAxeClick(TObject *Sender);
 	void __fastcall Changepalette1Click(TObject *Sender);
 	void __fastcall Changeshader1Click(TObject *Sender);
-	void __fastcall SetRatio1Click(TObject *Sender);
 	void __fastcall SaveScreenShot1Click(TObject *Sender);
 	void __fastcall RightAxeClick(TObject *Sender);
 	void __fastcall ShowHorizonsClick(TObject *Sender);
