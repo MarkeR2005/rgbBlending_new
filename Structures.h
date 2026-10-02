@@ -15,7 +15,7 @@ static int stnXWindow = 5;
 static int stnTWindow = 5;
 static int stnFWindow = 5;
 static float stnFilterFreq = 15;
-// One ordinate per trace; exactly -1 means no picked point.
+// One ordinate per trace; every negative or nonfinite value is a gap.
 struct Horizon {
     std::wstring name;
     std::vector<float> points;

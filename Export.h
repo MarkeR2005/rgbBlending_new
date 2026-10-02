@@ -22,7 +22,7 @@ extern "C" TForm* __cdecl EXPORT CreateRgbBlendingForm(System::UnicodeString pat
 extern "C" TForm* __cdecl EXPORT CreateRgbBlendingFormCube(System::UnicodeString path);
 // Public STL types; no definitions from Structures.h are needed by the host.
 // Each pair contains (name, ordinates) or (name, trace index), respectively.
-// Exactly -1 marks a missing ordinate. Setters copy the lists before return.
+// Negative or nonfinite ordinates mark gaps. Setters copy the lists before return.
 typedef std::vector<std::pair<std::wstring, std::vector<float>>> RgbHorizons;
 // One 0xRRGGBB color per horizon, in the same order. Missing entries use negative mode.
 typedef std::vector<std::uint32_t> RgbHorizonColors;

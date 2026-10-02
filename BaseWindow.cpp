@@ -26,32 +26,21 @@ std::string utf8Name(const std::wstring& value) {
         &result[0], bytes, nullptr, nullptr);
     return result;
 }
-bool isHorizonPoint(float value) { return std::isfinite(value) && value != -1.0f; }
-// A missing sample separates strokes. Leave room for the widest (7 px) outline
-// at each end so narrow gaps do not turn into apparent vertical marks.
+bool isHorizonPoint(float value) { return std::isfinite(value) && value >= 0.0f; }
+// Each contiguous run is a separate polyline; a run of one is a visible dot.
 using HorizonStrips = std::vector<std::vector<float>>;
-int horizonGapGuard(float zoom, float ratioX) {
-    if (zoom <= 0.0f || ratioX <= 0.0f) return 0;
-    return std::max(0, static_cast<int>(std::ceil(4.0f*ratioX/zoom))-1);
-}
-HorizonStrips buildHorizonStrips(const std::vector<float>& points, int width, int guard) {
+HorizonStrips buildHorizonStrips(const std::vector<float>& points, int width) {
     HorizonStrips strips;
     const size_t limit = std::min(points.size(), static_cast<size_t>(std::max(0, width)));
     size_t x = 0;
     while (x < limit) {
         if (!isHorizonPoint(points[x])) { ++x; continue; }
-        const size_t first = x;
-        while (x < limit && isHorizonPoint(points[x])) ++x;
-        const size_t last = x;
-        const size_t begin = first + (first > 0 ? std::min<size_t>(guard, last-first) : 0);
-        const size_t end = last - (last < limit ? std::min<size_t>(guard, last-first) : 0);
-        if (end <= begin+1) continue; // No connected pair remains.
         std::vector<float> strip;
-        strip.reserve((end-begin)*2);
-        for (size_t i = begin; i < end; ++i) {
-            strip.push_back(static_cast<float>(i));
-            strip.push_back(points[i]);
-        }
+        do {
+            strip.push_back(static_cast<float>(x));
+            strip.push_back(points[x]);
+            ++x;
+        } while (x < limit && isHorizonPoint(points[x]));
         strips.push_back(std::move(strip));
     }
     return strips;
@@ -349,11 +338,10 @@ void FlatWindow::renderHorizons()
     glUniform2f(glGetUniformLocation(horizonProgram, "offset"), offsetX, offsetY*dT);
     glUniform2f(glGetUniformLocation(horizonProgram, "windowSize"), Wwidth, Wheight);
     glUniform2f(glGetUniformLocation(horizonProgram, "pixelRatio"), pixelRatioX, pixelRatioY);
-    const int guard = horizonGapGuard(zoom, pixelRatioX);
     std::vector<HorizonStrips> geometry;
     geometry.reserve(horizons.size());
     for (const auto& horizon : horizons)
-        geometry.push_back(buildHorizonStrips(horizon.points, width, guard));
+        geometry.push_back(buildHorizonStrips(horizon.points, width));
     updateVisibleHorizonAnchors(geometry);
     auto draw = [&](const HorizonStrips& strips, float stroke) {
         glBindVertexArray(VAO1);
@@ -361,7 +349,10 @@ void FlatWindow::renderHorizons()
         for (const auto& strip : strips) {
             glBindBuffer(GL_ARRAY_BUFFER, VBO1);
             glBufferData(GL_ARRAY_BUFFER, strip.size()*sizeof(float), strip.data(), GL_DYNAMIC_DRAW);
-            glDrawArrays(GL_LINE_STRIP, 0, strip.size()/2);
+            if (strip.size() == 2) {
+                glPointSize(std::min(stroke, 5.0f));
+                glDrawArrays(GL_POINTS, 0, 1);
+            } else glDrawArrays(GL_LINE_STRIP, 0, strip.size()/2);
         }
         glBindVertexArray(0);
     };
@@ -462,6 +453,12 @@ void FlatWindow::updateVisibleHorizonAnchors(const std::vector<std::vector<std::
     for (size_t i = 0; i < geometry.size(); ++i) {
         auto& anchor = visibleHorizonAnchors[i];
         for (const auto& strip : geometry[i]) {
+            if (strip.size() == 2) {
+                const float sx = (strip[0]-offsetX)*zoom/pixelRatioX;
+                const float sy = (strip[1]-offsetY*dT)*zoom/pixelRatioY;
+                if (sx >= 0 && sx < Wwidth && sy >= 0 && sy < Wheight && sx < anchor.first)
+                    anchor = {sx, sy};
+            }
             for (size_t j = 0; j+3 < strip.size(); j += 2) {
                 float sx = (strip[j]-offsetX)*zoom/pixelRatioX;
                 float sy = (strip[j+1]-offsetY*dT)*zoom/pixelRatioY;
@@ -548,38 +545,29 @@ void FlatWindow::updateHorizonLabels() {
 std::string FlatWindow::hoveredOverlay(double screenX, double screenY) const {
     if (zoom <= 0 || pixelRatioX <= 0 || pixelRatioY <= 0) return {};
     if (showHorizons) {
-        const int guard = horizonGapGuard(zoom, pixelRatioX);
         const double trace = screenX*pixelRatioX/zoom+offsetX;
         const int radius = std::max(1, static_cast<int>(std::ceil(5.0f*pixelRatioX/zoom))+1);
         for (const auto& horizon : horizons) {
             const auto& points = horizon.points;
             const int limit = std::min(width, static_cast<int>(points.size()));
-            if (limit < 2) continue;
             const int first = std::max(0, static_cast<int>(std::floor(trace))-radius);
-            const int last = std::min(limit-2, static_cast<int>(std::ceil(trace))+radius);
-            int runEnd = 0, visibleBegin = 0, visibleEnd = 0;
+            const int last = std::min(limit-1, static_cast<int>(std::ceil(trace))+radius);
             for (int x = first; x <= last; ++x) {
-                if (!isHorizonPoint(points[x]) || !isHorizonPoint(points[x+1])) continue;
-                if (x >= runEnd) {
-                    int begin = x;
-                    while (begin > 0 && isHorizonPoint(points[begin-1])) --begin;
-                    runEnd = x+2;
-                    while (runEnd < limit && isHorizonPoint(points[runEnd])) ++runEnd;
-                    const int count = runEnd-begin;
-                    visibleBegin = begin + (begin > 0 ? std::min(guard, count) : 0);
-                    visibleEnd = runEnd - (runEnd < limit ? std::min(guard, count) : 0);
-                }
-                if (x < visibleBegin || x+1 >= visibleEnd) continue;
+                if (!isHorizonPoint(points[x])) continue;
                 const double sx = (x-offsetX)*zoom/pixelRatioX;
                 const double sy = (points[x]-offsetY*dT)*zoom/pixelRatioY;
-                const double ex = (x+1-offsetX)*zoom/pixelRatioX;
-                const double ey = (points[x+1]-offsetY*dT)*zoom/pixelRatioY;
-                const double dx = ex-sx, dy = ey-sy;
-                const double fraction = std::max(0.0, std::min(1.0,
-                    ((screenX-sx)*dx+(screenY-sy)*dy)/(dx*dx+dy*dy)));
-                const double nearX = sx+fraction*dx, nearY = sy+fraction*dy;
-                if ((screenX-nearX)*(screenX-nearX)+(screenY-nearY)*(screenY-nearY) <= 25.0)
-                    return "Hor: " + utf8Name(horizon.name);
+                double distance2 = (screenX-sx)*(screenX-sx)+(screenY-sy)*(screenY-sy);
+                if (x+1 < limit && isHorizonPoint(points[x+1])) {
+                    const double ex = (x+1-offsetX)*zoom/pixelRatioX;
+                    const double ey = (points[x+1]-offsetY*dT)*zoom/pixelRatioY;
+                    const double dx = ex-sx, dy = ey-sy;
+                    const double fraction = std::max(0.0, std::min(1.0,
+                        ((screenX-sx)*dx+(screenY-sy)*dy)/(dx*dx+dy*dy)));
+                    const double nearX = sx+fraction*dx, nearY = sy+fraction*dy;
+                    distance2 = std::min(distance2,
+                        (screenX-nearX)*(screenX-nearX)+(screenY-nearY)*(screenY-nearY));
+                }
+                if (distance2 <= 25.0) return "Hor: " + utf8Name(horizon.name);
             }
         }
     }
