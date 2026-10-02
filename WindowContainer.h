@@ -100,6 +100,7 @@ public:
     bool getOverlayVisibility(bool& showH, bool& showC) const;
     void toggleHorizons();
     void toggleCrosses();
+    void panByPixels(int dx, int dy);
     void pollOverlayEvents();
 	static std::vector<TWindowContainer*> instances_;
 	int getFreqSize();

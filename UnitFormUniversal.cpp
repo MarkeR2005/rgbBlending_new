@@ -360,7 +360,15 @@ void __fastcall TFormUniversal::ShowCrossesClick(TObject*) {
 }
 void __fastcall TFormUniversal::FormKeyDown(TObject*, WORD &Key, TShiftState Shift) {
     if (Shift.Contains(ssCtrl) || Shift.Contains(ssAlt)) return;
-    if (Key == 'H' && ShowHorizons->Enabled) {
+    int dx = 0, dy = 0;
+    if (Key == VK_LEFT) dx = -32;
+    if (Key == VK_RIGHT) dx = 32;
+    if (Key == VK_UP) dy = -32;
+    if (Key == VK_DOWN) dy = 32;
+    if ((dx || dy) && windowContainer) {
+        windowContainer->panByPixels(dx, dy);
+        Key = 0;
+    } else if (Key == 'H' && ShowHorizons->Enabled) {
         ShowHorizonsClick(nullptr);
         Key = 0;
     } else if (Key == 'C' && ShowCrosses->Enabled) {

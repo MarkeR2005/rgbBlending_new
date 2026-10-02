@@ -41,15 +41,23 @@ bool __cdecl setHorizonsCallback(TForm* f, RgbHorizonsCallback callback, void* c
         callback(snapshot, context);
     });
 }
-bool __cdecl setHorizons(TForm* f, const RgbHorizons& input) {
+bool __cdecl setHorizons(TForm* f, const RgbHorizons& input, const RgbHorizonColors& colors) {
     auto* form = dynamic_cast<TFormUniversal*>(f);
     if (!form || !form->windowContainer) return false;
     std::vector<Horizon> converted;
     converted.reserve(input.size());
-    for (const auto& item : input) {
+    for (size_t i = 0; i < input.size(); ++i) {
+        const auto& item = input[i];
         Horizon horizon;
         horizon.name = item.first;
         horizon.points = item.second;
+        if (i < colors.size()) {
+            const std::uint32_t color = colors[i];
+            horizon.useColor = true;
+            horizon.red = static_cast<unsigned char>((color >> 16) & 0xFF);
+            horizon.green = static_cast<unsigned char>((color >> 8) & 0xFF);
+            horizon.blue = static_cast<unsigned char>(color & 0xFF);
+        }
         converted.push_back(std::move(horizon));
     }
     return form->setHorizons(converted);

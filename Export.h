@@ -3,6 +3,7 @@
 #ifndef ExportH
 #define ExportH
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <utility>
@@ -21,8 +22,10 @@ extern "C" TForm* __cdecl EXPORT CreateRgbBlendingForm(System::UnicodeString pat
 extern "C" TForm* __cdecl EXPORT CreateRgbBlendingFormCube(System::UnicodeString path);
 // Public STL types; no definitions from Structures.h are needed by the host.
 // Each pair contains (name, ordinates) or (name, trace index), respectively.
-// Negative/nonfinite ordinates mark gaps. Setters copy the lists before return.
+// Exactly -1 marks a missing ordinate. Setters copy the lists before return.
 typedef std::vector<std::pair<std::wstring, std::vector<float>>> RgbHorizons;
+// One 0xRRGGBB color per horizon, in the same order. Missing entries use negative mode.
+typedef std::vector<std::uint32_t> RgbHorizonColors;
 typedef std::vector<std::pair<std::wstring, int>> RgbCrosses;
 
 // The list passed to a callback is valid for the duration of the call.
@@ -34,7 +37,8 @@ typedef void (__cdecl *RgbHorizonsCallback)(const RgbHorizons& horizons, void* c
 extern "C" bool __cdecl EXPORT setTraceCallback(TForm* f, std::function<void(int)> callback);
 extern "C" bool __cdecl EXPORT setDisplayCallback(TForm* f, std::function<void(int, int, std::string)> callback);
 extern "C" bool __cdecl EXPORT setHorizonsCallback(TForm* f, RgbHorizonsCallback callback, void* context);
-extern "C" bool __cdecl EXPORT setHorizons(TForm* f, const RgbHorizons& horizons);
+extern "C" bool __cdecl EXPORT setHorizons(TForm* f, const RgbHorizons& horizons,
+    const RgbHorizonColors& colors = RgbHorizonColors());
 extern "C" bool __cdecl EXPORT setCrosses(TForm* f, const RgbCrosses& crosses);
 
 // Function pointer signatures for LoadLibrary/GetProcAddress clients.
@@ -45,7 +49,8 @@ typedef TForm* (__cdecl *CreateRgbBlendingFormCubeFn)(System::UnicodeString);
 typedef bool (__cdecl *SetTraceCallbackFn)(TForm*, std::function<void(int)>);
 typedef bool (__cdecl *SetDisplayCallbackFn)(TForm*, std::function<void(int, int, std::string)>);
 typedef bool (__cdecl *SetHorizonsCallbackFn)(TForm*, RgbHorizonsCallback, void*);
-typedef bool (__cdecl *SetHorizonsFn)(TForm*, const RgbHorizons&);
+// GetProcAddress callers pass an empty vector when no colors are supplied.
+typedef bool (__cdecl *SetHorizonsFn)(TForm*, const RgbHorizons&, const RgbHorizonColors&);
 typedef bool (__cdecl *SetCrossesFn)(TForm*, const RgbCrosses&);
 //-----------
 #endif

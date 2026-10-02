@@ -77,6 +77,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	void handleCursorPosMoveCallback(double _xpos, double _ypos);
 	void handleMouseButtonCallback(int button, int action, int mods);
 	void handleScrollCallback(double offsetx, double offsety);
+    void panByPixels(int dx, int dy);
 	void processEvents();
 	//AccesibleVariables
 
@@ -134,7 +135,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
     void drawLabel(const TextLabel& label, float x, float y);
     void renderCrossLabels();
     void renderHorizonLabels(bool outline = false, float dx = 0.0f, float dy = 0.0f);
-    void updateVisibleHorizonAnchors();
+    void updateVisibleHorizonAnchors(const std::vector<std::vector<std::vector<float>>>& geometry);
 	std::vector<point2> highlighted_points = {};
 	//static std::vector<FlatWindow*> instances_;
 

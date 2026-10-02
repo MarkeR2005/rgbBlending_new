@@ -232,6 +232,9 @@ void TWindowContainer::toggleCrosses() {
     auto* flat = dynamic_cast<FlatWindow*>(window.get());
     if (flat) flat->setCrossesVisible(!flat->crossesVisible());
 }
+void TWindowContainer::panByPixels(int dx, int dy) {
+    if (auto* flat = dynamic_cast<FlatWindow*>(window.get())) flat->panByPixels(dx, dy);
+}
 void TWindowContainer::pollOverlayEvents() {
     auto* flat = dynamic_cast<FlatWindow*>(window.get());
     if (flat && flat->getWindow()) glfwPollEvents();
