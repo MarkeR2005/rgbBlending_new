@@ -9,6 +9,7 @@
 #pragma package(smart_init)
 SeismicWindow::SeismicWindow():FlatWindow()
 {
+    blackCrosses = true;
 }
 //--
 SeismicWindow::~SeismicWindow()
@@ -52,7 +53,7 @@ void SeismicWindow::initPaletteTexture(const std::array<uint8_t, 256*3>& palette
 	glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 }
 //--
-void SeismicWindow::initIndexTexture(const bitMap& texture)
+void SeismicWindow::initIndexTexture(bitMap texture)
 {
 	//Проверка инициализации
 	if (!handle) throw Exception("Uninitialized window");
@@ -60,6 +61,7 @@ void SeismicWindow::initIndexTexture(const bitMap& texture)
 	//Выставляем параметры
 	width = texture.width;
 	height = texture.height;
+    indexPixels.clear();
 	//Создаём текстуру
 	glGenTextures(1, &indexTexture);
 	glBindTexture(GL_TEXTURE_2D, indexTexture);
@@ -78,6 +80,13 @@ void SeismicWindow::initIndexTexture(const bitMap& texture)
 	{
 		throw Exception(err);
 	}
+    indexPixels = std::move(texture.texture);
+}
+bool SeismicWindow::getIndex(int x, int y, int& value) const {
+    if (x < 0 || y < 0 || x >= width || y >= height ||
+        indexPixels.size() != static_cast<size_t>(width)*height) return false;
+    value = indexPixels[static_cast<size_t>(y)*width+x];
+    return true;
 }
 //--
 void SeismicWindow::renderWindow()

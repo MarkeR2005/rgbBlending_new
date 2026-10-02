@@ -13,8 +13,11 @@
 #include "Reader.h"
 #include "SeismicPlane.h"
 #include "RgbPlane.h"
+#include <Vcl.ComCtrls.hpp>
+#include <Vcl.Dialogs.hpp>
 #include <thread>
 #include <chrono>
+#include <cmath>
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 
@@ -30,6 +33,21 @@ __fastcall TWindowContainer::TWindowContainer(TComponent* Owner) : TPanel(Owner)
 	viewPanel = new TPanel(this);
 	viewPanel->Parent = this;
 	viewPanel->Align = alClient;
+    updateHorizonsButton = new TButton(this);
+    updateHorizonsButton->Parent = this;
+    updateHorizonsButton->Align = alTop;
+    updateHorizonsButton->Height = 28;
+    updateHorizonsButton->Caption = L"Обновить горизонты";
+    updateHorizonsButton->OnClick = UpdateHorizonsClick;
+    updateHorizonsButton->Visible = false;
+    rgbChangeTimer = new TTimer(this);
+    rgbChangeTimer->Enabled = false;
+    rgbChangeTimer->Interval = 250;
+    rgbChangeTimer->OnTimer = ApplyRgbChannels;
+    displayTimer = new TTimer(this);
+    displayTimer->Enabled = false;
+    displayTimer->Interval = 200;
+    displayTimer->OnTimer = ApplyDisplayCallback;
 
 	image1 = new TImage(this);
 	image1->Height = 1440;
@@ -63,6 +81,36 @@ __fastcall TWindowContainer::TWindowContainer(TComponent* Owner) : TPanel(Owner)
 	image4 ->Visible = false;
 	image4 ->Enabled = false;
 
+    ratioPanel = new TPanel(this);
+    ratioPanel->Parent = this;
+    ratioPanel->SetBounds(0, Height-50, 255, 50);
+    ratioPanel->BevelOuter = bvNone;
+    ratioPanel->Color = clInfoBk;
+    ratioPanel->Visible = false;
+    ratioXLabel = new TLabel(this);
+    ratioXLabel->Parent = ratioPanel;
+    ratioXLabel->SetBounds(3, 3, 62, 19);
+    ratioXLabel->Caption = L"X 1.00";
+    ratioYLabel = new TLabel(this);
+    ratioYLabel->Parent = ratioPanel;
+    ratioYLabel->SetBounds(3, 26, 62, 19);
+    ratioYLabel->Caption = L"T 1.00";
+    ratioXSlider = new TTrackBar(this);
+    ratioXSlider->Parent = ratioPanel;
+    ratioXSlider->SetBounds(68, 0, 185, 23);
+    ratioXSlider->Min = -10; ratioXSlider->Max = 10;
+    ratioXSlider->Position = 0;
+    ratioXSlider->TickStyle = tsNone;
+    ratioXSlider->OnChange = RatioChange;
+    ratioYSlider = new TTrackBar(this);
+    ratioYSlider->Parent = ratioPanel;
+    ratioYSlider->SetBounds(68, 23, 185, 23);
+    ratioYSlider->Min = -10; ratioYSlider->Max = 10;
+    ratioYSlider->Position = 0;
+    ratioYSlider->TickStyle = tsNone;
+    ratioYSlider->OnChange = RatioChange;
+    ratioPanel->BringToFront();
+
 	axisY->createAxe(0, 100, viewPanel->Height, 3);
 	image1->Canvas->Brush->Color = clInfoBk;
 	image1->Canvas->FillRect(Rect(0, 0, viewPanel->Width, viewPanel->Height));
@@ -91,6 +139,10 @@ __fastcall TWindowContainer::TWindowContainer(TComponent* Owner) : TPanel(Owner)
 	syncButton->Caption = "Sync";
 	FPopupMenu->Items->Add(syncButton);
     syncButton->OnClick = LockClick;
+    horizonStyleMenu = new TMenuItem(FPopupMenu);
+    horizonStyleMenu->Caption = L"Horizon colors";
+    horizonStyleMenu->Visible = false;
+    FPopupMenu->Items->Add(horizonStyleMenu);
 
 	instances_.push_back(this);
 
@@ -148,7 +200,56 @@ void TWindowContainer::changeShader(GLuint shaderProgram){
         flatWin->setShaderProgram(shaderProgram);
     }
 }
+bool TWindowContainer::setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb) {
+    if (!dynamic_cast<FlatWindow*>(window.get())) return false;
+    horizonsCallback = std::move(cb);
+    return true;
+}
+bool TWindowContainer::setHorizons(const std::vector<Horizon>& value) {
+    FlatWindow* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat) return false;
+    flat->setHorizons(value);
+    return true;
+}
+bool TWindowContainer::setCrosses(const std::vector<Cross>& value) {
+    FlatWindow* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat) return false;
+    flat->setCrosses(value);
+    return true;
+}
+bool TWindowContainer::getOverlayVisibility(bool& showH, bool& showC) const {
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat) return false;
+    showH = flat->horizonsVisible();
+    showC = flat->crossesVisible();
+    return true;
+}
+void TWindowContainer::toggleHorizons() {
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (flat) flat->setHorizonsVisible(!flat->horizonsVisible());
+}
+void TWindowContainer::toggleCrosses() {
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (flat) flat->setCrossesVisible(!flat->crossesVisible());
+}
+void TWindowContainer::panByPixels(int dx, int dy) {
+    if (auto* flat = dynamic_cast<FlatWindow*>(window.get())) flat->panByPixels(dx, dy);
+}
+void TWindowContainer::pollOverlayEvents() {
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (flat && flat->getWindow()) glfwPollEvents();
+}
+void __fastcall TWindowContainer::UpdateHorizonsClick(TObject*) {
+    FlatWindow* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (flat && horizonsCallback) {
+        const auto snapshot = flat->getHorizons();
+        horizonsCallback(snapshot);
+    }
+}
 void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
+    rgbChangeTimer->Enabled = false;
+    displayTimer->Enabled = false;
+    appliedR = appliedG = appliedB = pendingR = pendingG = pendingB = 0;
 	if (!data->getCM()) {
 		data->setCM(colorManager);
 	}
@@ -175,7 +276,7 @@ void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
 		}
 		window_->initWindow(viewPanel);
 //        std::this_thread::sleep_for(std::chrono::seconds(1));
-		window_->initTexture(rData->getTexture());
+		window_->initData(rData);
         window_->setDT(rData->getDT()/1000.0f);
         type = WindowType::RGB;
 		window = std::move(window_);
@@ -191,10 +292,13 @@ void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
     image3 ->Enabled = true;
     image4 ->Visible = true;
     image4 ->Enabled = true;
+    ratioPanel->Visible = true;
+    ratioPanel->BringToFront();
 	dataContainer = data;
-	setupCallbacks();
+    updateHorizonsButton->Visible = true;
+    setupCallbacks();
 	setupButtons();
-	window->resizeWindow(this->Width-50*((image1->Visible ? 1 : 0)+(image3->Visible ? 1 : 0)),this->Height-50*((image2->Visible ? 1 : 0) + (image4->Visible ? 1 : 0)));
+	window->resizeWindow(viewPanel->Width, viewPanel->Height);
 	updateAxis(true);
 	NameInfo->Caption = data->getName().c_str();
 }
@@ -202,6 +306,7 @@ void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
 
 
 void TWindowContainer::initialize(){
+    rgbChangeTimer->Enabled = false;
 	std::unique_ptr<ViewportWindow>window_ = std::make_unique<ViewportWindow>();
 	window_->initWindow(viewPanel);
 //    seismicShader = createShaderProgram("volumetric", "seismic");
@@ -215,6 +320,8 @@ void TWindowContainer::initialize(){
 	window_->setPerspective(45.0f, 0.1f, 10000.0f);
 	window = std::move(window_);
 	type = WindowType::VOL;
+    updateHorizonsButton->Visible = false;
+    ratioPanel->Visible = false;
 	syncButton->Enabled=false;
     syncButton->Visible=false;
 	setupCallbacks();
@@ -269,6 +376,8 @@ float TWindowContainer::getFreqByIndex(int idx){
 }
 
 __fastcall TWindowContainer::~TWindowContainer(){
+    if (rgbChangeTimer) rgbChangeTimer->Enabled = false;
+    if (displayTimer) displayTimer->Enabled = false;
     auto it = std::find(instances_.begin(), instances_.end(), this);
     if (it != instances_.end()) {
         instances_.erase(it);
@@ -283,20 +392,32 @@ __fastcall TWindowContainer::~TWindowContainer(){
 
 
 void __fastcall TWindowContainer::Resize(TObject* Sender){
+    if (ratioPanel) ratioPanel->Top = Height-ratioPanel->Height;
 	if (!window) {
 		return;
     }
-	window->resizeWindow(this->Width-50*(image1->Visible ? 1 : 0),this->Height-50*(image2->Visible ? 1 : 0));
+	window->resizeWindow(viewPanel->Width, viewPanel->Height);
 	updateAxis(true);
+}
+void __fastcall TWindowContainer::ApplyRgbChannels(TObject*) {
+    rgbChangeTimer->Enabled = false;
+    auto* rgb = dynamic_cast<RgbWindow*>(window.get());
+    if (!rgb) return;
+    rgb->setColor(pendingR, pendingG, pendingB);
+    appliedR = pendingR; appliedG = pendingG; appliedB = pendingB;
+    rgb->renderWindow();
 }
 void TWindowContainer::setViewParams(viewParams params){
 	IRgbWindow* wd = dynamic_cast<IRgbWindow*>(window.get());
 	FlatWindow* wd1 = dynamic_cast<FlatWindow*>(window.get());
     IVolumeWindow* wd2 = dynamic_cast<IVolumeWindow*>(window.get());
 	if (wd != nullptr) {
-		wd->setColor(params.r,params.g,params.b);
-		wd->setView(params.isR, params.isG, params.isB);
-	}
+        wd->setView(params.isR, params.isG, params.isB);
+        pendingR = params.r; pendingG = params.g; pendingB = params.b;
+        rgbChangeTimer->Enabled = false;
+        if (pendingR != appliedR || pendingG != appliedG || pendingB != appliedB)
+            rgbChangeTimer->Enabled = true; // coalesce rapid scrollbar events
+    }
 	if (wd1 != nullptr) {
 		wd1->setContrast(params.contrast);
 	}
@@ -304,22 +425,73 @@ void TWindowContainer::setViewParams(viewParams params){
 		wd2->setChannels(params.r,params.g,params.b);
 		wd2->setChannelEnabled(params.isR, params.isG, params.isB);
 	}
-    window->renderWindow();
+    auto* rgb = dynamic_cast<RgbWindow*>(window.get());
+    if (rgb && rgbChangeTimer->Enabled &&
+        rgb->hasCachedLayers(pendingR, pendingG, pendingB)) {
+        ApplyRgbChannels(nullptr);
+    } else {
+        window->renderWindow();
+    }
 }
-void TWindowContainer::setRatio(){
-	FlatWindow* wd1 = dynamic_cast<FlatWindow*>(window.get());
-	if (wd1 != nullptr) {
-		float rx = 1.0f;
-		float ry = 1.0f;
-		TAbstractDialog* dialog = new TAbstractDialog(nullptr);
-		dialog->AddInput<float>("Сжатие по X", rx);
-		dialog->AddInput<float>("Сжатие по T", ry);
-		if (dialog->Execute() && dialog->ContinuePressed) {
-		wd1->setRatio(rx,ry);
-        updateAxis(true);
-		}
-	}
-    window->renderWindow();
+void __fastcall TWindowContainer::RatioChange(TObject*) {
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat || !ratioXSlider || !ratioYSlider) return;
+    const float rx = std::pow(10.0f, ratioXSlider->Position/10.0f);
+    const float ry = std::pow(10.0f, ratioYSlider->Position/10.0f);
+    ratioXLabel->Caption = (L"X " + std::to_wstring(rx).substr(0, 4)).c_str();
+    ratioYLabel->Caption = (L"T " + std::to_wstring(ry).substr(0, 4)).c_str();
+    flat->setRatio(rx, ry);
+    flat->resizeWindow(viewPanel->Width, viewPanel->Height);
+    updateAxis(true);
+    flat->renderWindow();
+}
+
+void TWindowContainer::rebuildHorizonStyleMenu() {
+    if (!horizonStyleMenu) return;
+    for (auto* action : horizonStyleActions) func.erase(action);
+    horizonStyleActions.clear();
+    horizonStyleMenu->Clear();
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat) {horizonStyleMenu->Visible = false; return;}
+    horizonStyleMenu->Visible = true;
+    const auto& horizons = flat->getHorizons();
+    horizonStyleMenu->Enabled = !horizons.empty();
+    for (size_t i = 0; i < horizons.size(); ++i) {
+        const auto& horizon = horizons[i];
+        TMenuItem* sub = new TMenuItem(horizonStyleMenu);
+        sub->Caption = horizon.name.empty() ?
+            (L"Horizon " + std::to_wstring(i+1)).c_str() : horizon.name.c_str();
+        horizonStyleMenu->Add(sub);
+        auto addAction = [&](const wchar_t* caption, bool checked, std::function<void()> fn) {
+            TMenuItem* item = new TMenuItem(sub);
+            item->Caption = caption;
+            item->Checked = checked;
+            sub->Add(item);
+            func[item] = std::move(fn);
+            horizonStyleActions.push_back(item);
+            item->OnClick = useFunction;
+        };
+        addAction(L"Choose color...", horizon.useColor, [this, i]() {
+            auto* current = dynamic_cast<FlatWindow*>(window.get());
+            if (!current || i >= current->getHorizons().size()) return;
+            std::unique_ptr<TColorDialog> dialog(new TColorDialog(this));
+            const auto& h = current->getHorizons()[i];
+            dialog->Color = static_cast<TColor>(RGB(h.red, h.green, h.blue));
+            if (dialog->Execute()) {
+                const COLORREF c = ColorToRGB(dialog->Color);
+                current->setHorizonColor(i, GetRValue(c), GetGValue(c), GetBValue(c));
+            }
+        });
+        addAction(L"Negative (default)", !horizon.useColor, [this, i]() {
+            if (auto* current = dynamic_cast<FlatWindow*>(window.get())) current->setHorizonNegative(i);
+        });
+        addAction(L"Contrast outline", horizon.contrast, [this, i]() {
+            if (auto* current = dynamic_cast<FlatWindow*>(window.get())) {
+                if (i < current->getHorizons().size())
+                    current->setHorizonContrast(i, !current->getHorizons()[i].contrast);
+            }
+        });
+    }
 }
 
 void TWindowContainer::showPopupMenu(int button, int action, int mode)
@@ -328,6 +500,7 @@ void TWindowContainer::showPopupMenu(int button, int action, int mode)
 		POINT pt;
 		GetCursorPos(&pt);
         getPos();
+        rebuildHorizonStyleMenu();
 		PopupMenu->Popup(pt.x, pt.y);
 	}
 }
@@ -350,14 +523,69 @@ void TWindowContainer::getPos(){
 		auto sData = std::dynamic_pointer_cast<SeismicData>(dataContainer);
 		if (sData) {
 			if (sData->getType() == DataType::SWAN || sData->getType() == DataType::EN_SWAN) {
-				PosInfo->Caption = (std::to_string(sData->getFreq()[posx_]) + ";" + std::to_string(posy_)).c_str();
-				return;
+                const auto& frequencies = sData->getFreqRef();
+                if (posx_ >= 0 && posx_ < static_cast<int>(frequencies.size())) {
+                    PosInfo->Caption = (std::to_string(frequencies[posx_]) + ";" +
+                                        std::to_string(posy_)).c_str();
+                    return;
+                }
 			}
 		}
 		PosInfo->Caption = (std::to_string(posx_) + ";" + std::to_string(posy_)).c_str();
 	}
 }
 
+
+void TWindowContainer::scheduleDisplay(double x, double y) {
+    if (!callbackDisp) return;
+    pendingMouseX = x;
+    pendingMouseY = y;
+    displayTimer->Enabled = false;
+    displayTimer->Enabled = true;
+}
+void __fastcall TWindowContainer::ApplyDisplayCallback(TObject*) {
+    displayTimer->Enabled = false;
+    if (!callbackDisp) return;
+    auto* flat = dynamic_cast<FlatWindow*>(window.get());
+    if (!flat || !flat->getWindow()) return;
+    double mouseX = 0, mouseY = 0;
+    glfwGetCursorPos(flat->getWindow(), &mouseX, &mouseY);
+    if (std::abs(mouseX-pendingMouseX) > 0.5 || std::abs(mouseY-pendingMouseY) > 0.5) {
+        scheduleDisplay(mouseX, mouseY);
+        return;
+    }
+    int winWidth = 0, winHeight = 0, fbWidth = 0, fbHeight = 0;
+    glfwGetWindowSize(flat->getWindow(), &winWidth, &winHeight);
+    glfwGetFramebufferSize(flat->getWindow(), &fbWidth, &fbHeight);
+    if (winWidth <= 0 || winHeight <= 0 || mouseX < 0 || mouseY < 0 ||
+        mouseX >= winWidth || mouseY >= winHeight) return;
+    const double screenX = mouseX*fbWidth/winWidth;
+    const double screenY = mouseY*fbHeight/winHeight;
+    float ratioX, ratioY, offsetX, offsetY;
+    flat->getRatio(ratioX, ratioY);
+    flat->getOffset(offsetX, offsetY);
+    const float zoom = flat->getZoom(), dT = flat->getDT();
+    if (zoom <= 0 || dT <= 0 || ratioX <= 0 || ratioY <= 0) return;
+    const int x = static_cast<int>(std::floor(screenX*ratioX/zoom+offsetX));
+    const int y = static_cast<int>(std::floor(screenY*ratioY/zoom/dT+offsetY));
+    int width, height;
+    flat->getSize(width, height);
+    if (x < 0 || y < 0 || x >= width || y >= height) return;
+    std::string info = flat->hoveredOverlay(screenX, screenY);
+    if (info.empty()) {
+        if (auto* seismic = dynamic_cast<SeismicWindow*>(window.get())) {
+            int index = 0;
+            if (!seismic->getIndex(x, y, index)) return;
+            info = "Ampl: " + std::to_string(index-127);
+        } else if (auto* rgb = dynamic_cast<RgbWindow*>(window.get())) {
+            int r = 0, g = 0, b = 0;
+            if (!rgb->getPixelComponents(x, y, r, g, b)) return;
+            info = "R:" + std::to_string(r) + ", G:" + std::to_string(g) +
+                   ", B:" + std::to_string(b);
+        } else return;
+    }
+    callbackDisp(x, static_cast<int>(y*dT), info);
+}
 
 void TWindowContainer::setupCallbacks()
 {
@@ -373,6 +601,7 @@ void TWindowContainer::setupCallbacks()
 				}
 				updateAxis(true);});
 			winCall->setCursorPosCallback([this](double ox, double oy){
+                scheduleDisplay(ox, oy);
 			if (syncButton->Checked) {
 					TWindowContainer::emitToAll();
 					return;
@@ -380,9 +609,6 @@ void TWindowContainer::setupCallbacks()
 				updateAxis(false);
                 getPos();
                 callback(posx_);
-                IFlatWindow* flatWin = dynamic_cast<IFlatWindow*>(window.get());
-                float dT = flatWin->getDT();
-                callbackDisp(posx_, posy_*dT);
                 });
 		break;
 		case WindowType::RGB:
@@ -394,6 +620,7 @@ void TWindowContainer::setupCallbacks()
 				}
 				updateAxis(true);});
 			winCall->setCursorPosCallback([this](double ox, double oy){
+                scheduleDisplay(ox, oy);
 			if (syncButton->Checked) {
 					emitToAll();
 					return;
@@ -401,9 +628,6 @@ void TWindowContainer::setupCallbacks()
 				updateAxis(false);
                 getPos();
                 callback(posx_);
-                IFlatWindow* flatWin = dynamic_cast<IFlatWindow*>(window.get());
-                float dT = flatWin->getDT();
-                callbackDisp(posx_, posy_*dT);
                 });
 		break;
 		case WindowType::VOL:
@@ -412,6 +636,10 @@ void TWindowContainer::setupCallbacks()
 		default:
 		throw;
 		}
+        if (type == WindowType::SEIS || type == WindowType::RGB)
+            winCall->setCursorEnterCallback([this](int entered) {
+                if (!entered) displayTimer->Enabled = false;
+            });
 	}
 }
 
@@ -432,6 +660,65 @@ void TWindowContainer::createWindow(const std::shared_ptr<IBaseData>& newData, i
 }
 
 void TWindowContainer::setupFlatButtons(){
+    addButton("Edit horizon (draw with mouse)", [this]() {
+        auto* flat = dynamic_cast<FlatWindow*>(window.get());
+        if (!flat) return;
+        if (flat->horizonEditing()) {flat->setHorizonEditing(false); return;}
+
+        std::unique_ptr<TForm> picker(new TForm(this));
+        picker->Caption = L"Выбор горизонта для редактирования";
+        picker->BorderStyle = bsDialog;
+        picker->Position = poScreenCenter;
+        picker->ClientWidth = 370;
+        picker->ClientHeight = 380;
+        TTreeView* tree = new TTreeView(picker.get());
+        tree->Parent = picker.get();
+        tree->SetBounds(12, 12, 346, 270);
+        TTreeNode* root = tree->Items->Add(nullptr, L"Горизонты");
+        const auto& horizons = flat->getHorizons();
+        TTreeNode* firstNode = nullptr;
+        for (size_t i = 0; i < horizons.size(); ++i) {
+            const std::wstring name = horizons[i].name.empty()
+                ? L"Горизонт " + std::to_wstring(i+1) : horizons[i].name;
+            TTreeNode* node = tree->Items->AddChild(root, name.c_str());
+            if (!firstNode) firstNode = node;
+        }
+        TTreeNode* createNode = tree->Items->AddChild(root, L"+ Новый горизонт");
+        root->Expand(true);
+        tree->Selected = firstNode ? firstNode : createNode;
+
+        TLabel* nameLabel = new TLabel(picker.get());
+        nameLabel->Parent = picker.get();
+        nameLabel->SetBounds(12, 292, 340, 20);
+        nameLabel->Caption = L"Имя нового горизонта:";
+        TEdit* nameEdit = new TEdit(picker.get());
+        nameEdit->Parent = picker.get();
+        nameEdit->SetBounds(12, 312, 346, 24);
+        nameEdit->Text = (L"Горизонт " + std::to_wstring(horizons.size()+1)).c_str();
+
+        TButton* accept = new TButton(picker.get());
+        accept->Parent = picker.get();
+        accept->SetBounds(182, 345, 84, 25);
+        accept->Caption = L"Выбрать";
+        accept->ModalResult = mrOk;
+        accept->Default = true;
+        TButton* cancel = new TButton(picker.get());
+        cancel->Parent = picker.get();
+        cancel->SetBounds(274, 345, 84, 25);
+        cancel->Caption = L"Отмена";
+        cancel->ModalResult = mrCancel;
+        cancel->Cancel = true;
+
+        if (picker->ShowModal() != mrOk || !tree->Selected || tree->Selected->Parent != root)
+            return;
+        const size_t index = static_cast<size_t>(tree->Selected->Index);
+        if (tree->Selected == createNode) {
+            const std::wstring name = nameEdit->Text.c_str();
+            flat->selectHorizon(index, name);
+        } else {
+            flat->selectHorizon(index);
+        }
+    });
 	addButton("Smooth T", [&](){
 		TAbstractDialog* dialog = new TAbstractDialog(nullptr);
 		dialog->AddInput<int>("Окно (отсчётов)", stnTWindow);
@@ -968,6 +1255,7 @@ void TWindowContainer::saveVolScreenshot(System::UnicodeString path){
 }
 
 void TWindowContainer::saveScreenshot(System::UnicodeString path){
+    if (rgbChangeTimer && rgbChangeTimer->Enabled) ApplyRgbChannels(nullptr);
 	IFlatWindow* winFlat = dynamic_cast<IFlatWindow*>(window.get());
 	if (!winFlat) {
 		return saveVolScreenshot(path);

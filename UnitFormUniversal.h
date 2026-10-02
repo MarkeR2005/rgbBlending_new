@@ -54,9 +54,10 @@ __published:	// IDE-managed Components
 	TMenuItem *TopAxe;
 	TMenuItem *Changepalette1;
 	TMenuItem *Changeshader1;
-	TMenuItem *SetRatio1;
 	TMenuItem *SaveScreenShot1;
 	TMenuItem *RightAxe;
+	TMenuItem *ShowHorizons;
+	TMenuItem *ShowCrosses;
 	void __fastcall FormClose(TObject *Sender, TCloseAction &Action);
 	void __fastcall OpenAsClick(TObject *Sender);
 	void __fastcall ScrollBar1Change(TObject *Sender);
@@ -71,11 +72,15 @@ __published:	// IDE-managed Components
 	void __fastcall TopAxeClick(TObject *Sender);
 	void __fastcall Changepalette1Click(TObject *Sender);
 	void __fastcall Changeshader1Click(TObject *Sender);
-	void __fastcall SetRatio1Click(TObject *Sender);
 	void __fastcall SaveScreenShot1Click(TObject *Sender);
 	void __fastcall RightAxeClick(TObject *Sender);
+	void __fastcall ShowHorizonsClick(TObject *Sender);
+	void __fastcall ShowCrossesClick(TObject *Sender);
+	void __fastcall FormKeyDown(TObject *Sender, WORD &Key, TShiftState Shift);
 private:	// User declarations
     System::UnicodeString path = "";
+    TTimer* overlayEventsTimer = nullptr;
+    void __fastcall PollOverlayEvents(TObject *Sender);
 public:		// User declarations
 	TWindowContainer* windowContainer = nullptr;
     System::UnicodeString getPath() {return path;};
@@ -101,10 +106,15 @@ public:		// User declarations
 		ScrollBarG->Max = std::max(fr_size-1, 0);
 		ScrollBarB->Max = std::max(fr_size-1, 0);
     };
-    void setTraceCallback(std::function<void(int)> callback){
-        windowContainer->setTraceCallback(callback);
+    bool setHorizons(const std::vector<Horizon>& value){return windowContainer->setHorizons(value);}
+    bool setCrosses(const std::vector<Cross>& value){return windowContainer->setCrosses(value);}
+    bool setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb){
+        return windowContainer->setHorizonsCallback(std::move(cb));
     }
-    void setDisplayCallback(std::function<void(int, int)> callback){
+    void setTraceCallback(std::function<void(int)> callback){
+        windowContainer->setTraceCallback(std::move(callback));
+    }
+    void setDisplayCallback(std::function<void(int, int, std::string)> callback){
         windowContainer->setDisplayCallback(callback);
     }
 };
