@@ -111,7 +111,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	//--
     float dT = 1.0f;
 
-	int Wwidth, Wheight;
+	int Wwidth = 1, Wheight = 1;
 
 	std::function<void(int, int, int)> mouseButtonCallback = [](int button, int action, int mods){};
 	std::function<void(double, double)> cursorPosCallback = [](double x, double y){};
@@ -156,6 +156,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 
 	bool isDragging = false;
     bool eraseStroke = false;
+    bool screenshotRendering = false;
 	//--
 	double lastMouseX = 0.0;
 	//--

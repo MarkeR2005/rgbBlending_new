@@ -285,7 +285,7 @@ void FlatWindow::preRender()
 {
 	glfwMakeContextCurrent(handle);
 	//Очистка области для рендеринга
-	glfwGetFramebufferSize(handle, &Wwidth, &Wheight);
+	if (!screenshotRendering) glfwGetFramebufferSize(handle, &Wwidth, &Wheight);
 	glViewport(0, 0, Wwidth, Wheight);
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -296,7 +296,7 @@ void FlatWindow::render()
 	//Выбор программы для рендеринга
 	glUseProgram(shaderProgram);
 	//Получаем параметры
-	glfwGetFramebufferSize(handle, &Wwidth, &Wheight);
+	if (!screenshotRendering) glfwGetFramebufferSize(handle, &Wwidth, &Wheight);
 	//Передача данных
 
 	glUniform1f(glGetUniformLocation(shaderProgram, "zoom"), zoom);
@@ -314,7 +314,7 @@ void FlatWindow::renderHighlights()
 	//Выбор программы для рендеринга
 	glUseProgram(highlightProgram);
 	//Передача данных
-	glfwGetFramebufferSize(handle, &Wwidth, &Wheight);
+	if (!screenshotRendering) glfwGetFramebufferSize(handle, &Wwidth, &Wheight);
 	//Передача данных
 	glUniform1f(glGetUniformLocation(highlightProgram, "zoom"), zoom);
 	glUniform2f(glGetUniformLocation(highlightProgram, "imageSize"), width, height);
@@ -844,35 +844,89 @@ void FlatWindow::renderForScreenshot()
 
 Graphics::TBitmap* FlatWindow::getScreenshotAsBitmap()
 {
-if (!handle) return nullptr;
-Graphics::TBitmap* bmp = new Graphics::TBitmap;
-bmp->PixelFormat = pf24bit;
-float tzoom = zoom;
-//--
-float toffsetX = offsetX, toffsetY = offsetY;
-float tWidth = Wwidth , tHeight = Wheight;
+    if (!handle || width <= 0 || height <= 0 || dT <= 0.0f) return nullptr;
+    glfwMakeContextCurrent(handle);
+    GLint oldFramebuffer = 0, oldRenderbuffer = 0, oldReadBuffer = 0;
+    GLint oldPackAlignment = 0, oldViewport[4] = {};
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &oldFramebuffer);
+    glGetIntegerv(GL_RENDERBUFFER_BINDING, &oldRenderbuffer);
+    glGetIntegerv(GL_READ_BUFFER, &oldReadBuffer);
+    glGetIntegerv(GL_PACK_ALIGNMENT, &oldPackAlignment);
+    glGetIntegerv(GL_VIEWPORT, oldViewport);
+    GLint maxRenderbuffer = 0, maxViewport[2] = {};
+    glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE, &maxRenderbuffer);
+    glGetIntegerv(GL_MAX_VIEWPORT_DIMS, maxViewport);
+    const int tileWidth = std::min(width, std::min(2048, std::min(maxRenderbuffer, maxViewport[0])));
+    const int tileHeight = std::min(height, std::min(2048, std::min(maxRenderbuffer, maxViewport[1])));
+    if (tileWidth <= 0 || tileHeight <= 0)
+        throw Exception("Offscreen screenshot buffer is unavailable");
 
-zoom = 1.0f;
-offsetX = 0.0f;
-offsetY = 0.0f;
-Wwidth = width/pixelRatioX;
-Wheight = height/pixelRatioY;
-glfwSetWindowSize(handle, Wwidth, Wheight);
-bmp->Width = Wwidth;
-bmp->Height = Wheight+50;
-renderForScreenshot();
-glPixelStorei(GL_PACK_ALIGNMENT, 1);
-for (int y = 0; y < Wheight; y++) {
-    glReadPixels(0, y, Wwidth, 1, GL_BGR, GL_UNSIGNED_BYTE, bmp->ScanLine[Wheight -1 - y]);
-}
+    GLuint framebuffer = 0, color = 0, depthStencil = 0;
+    const float oldZoom = zoom, oldOffsetX = offsetX, oldOffsetY = offsetY;
+    const float oldRatioX = pixelRatioX, oldRatioY = pixelRatioY;
+    const int oldWidth = Wwidth, oldHeight = Wheight;
+    std::unique_ptr<Graphics::TBitmap> bitmap(new Graphics::TBitmap);
+    auto restore = [&]() {
+        screenshotRendering = false;
+        zoom = oldZoom; offsetX = oldOffsetX; offsetY = oldOffsetY;
+        pixelRatioX = oldRatioX; pixelRatioY = oldRatioY;
+        Wwidth = oldWidth; Wheight = oldHeight;
+        glBindFramebuffer(GL_FRAMEBUFFER, oldFramebuffer);
+        glReadBuffer(oldReadBuffer);
+        glPixelStorei(GL_PACK_ALIGNMENT, oldPackAlignment);
+        glViewport(oldViewport[0], oldViewport[1], oldViewport[2], oldViewport[3]);
+        glBindRenderbuffer(GL_RENDERBUFFER, oldRenderbuffer);
+        if (depthStencil) glDeleteRenderbuffers(1, &depthStencil);
+        if (color) glDeleteRenderbuffers(1, &color);
+        if (framebuffer) glDeleteFramebuffers(1, &framebuffer);
+    };
+    try {
+        glGenFramebuffers(1, &framebuffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+        glGenRenderbuffers(1, &color);
+        glBindRenderbuffer(GL_RENDERBUFFER, color);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, tileWidth, tileHeight);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, color);
+        glGenRenderbuffers(1, &depthStencil);
+        glBindRenderbuffer(GL_RENDERBUFFER, depthStencil);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, tileWidth, tileHeight);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthStencil);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+            throw Exception("Offscreen screenshot framebuffer is incomplete");
 
-zoom = tzoom;
-offsetX = toffsetX ;
-offsetY = toffsetY;
-Wwidth = tWidth;
-Wheight = tHeight;
-glfwSetWindowSize(handle, Wwidth, Wheight);
-return bmp;
+        bitmap->PixelFormat = pf24bit;
+        bitmap->SetSize(width, height);
+        // One pixel per trace and sample, independent of current zoom and ratios.
+        zoom = 1.0f;
+        pixelRatioX = 1.0f;
+        pixelRatioY = dT;
+        screenshotRendering = true;
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        for (int tileY = 0; tileY < height; tileY += tileHeight) {
+            const int currentHeight = std::min(tileHeight, height-tileY);
+            for (int tileX = 0; tileX < width; tileX += tileWidth) {
+                const int currentWidth = std::min(tileWidth, width-tileX);
+                Wwidth = currentWidth; Wheight = currentHeight;
+                offsetX = static_cast<float>(tileX);
+                offsetY = static_cast<float>(tileY);
+                renderForScreenshot();
+                for (int row = 0; row < currentHeight; ++row) {
+                    auto* destination = static_cast<unsigned char*>(bitmap->ScanLine[tileY+currentHeight-1-row]);
+                    glReadPixels(0, row, currentWidth, 1, GL_BGR, GL_UNSIGNED_BYTE,
+                                 destination + static_cast<size_t>(tileX)*3);
+                }
+                if (glGetError() != GL_NO_ERROR)
+                    throw Exception("Unable to read offscreen screenshot");
+            }
+        }
+    } catch (...) {
+        restore();
+        throw;
+    }
+    restore();
+    return bitmap.release();
 }
 
 bool FlatWindow::setHorizonColor(size_t index, unsigned char r, unsigned char g, unsigned char b) {

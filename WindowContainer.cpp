@@ -1261,20 +1261,21 @@ void TWindowContainer::saveScreenshot(System::UnicodeString path){
 		return saveVolScreenshot(path);
 	}
 
-    Graphics::TBitmap* result = winFlat->getScreenshotAsBitmap();
-    Graphics::TBitmap* fin = new TBitmap();
-    fin->Width = result->Width+100;
-    fin->Height = result->Height+100;
+    std::unique_ptr<Graphics::TBitmap> result(winFlat->getScreenshotAsBitmap());
+    if (!result) return;
+    std::unique_ptr<Graphics::TBitmap> fin(new Graphics::TBitmap);
+    fin->PixelFormat = pf24bit;
+    fin->SetSize(result->Width+100, result->Height+100);
 
     int sx, sy;
     float rx,ry;
     winFlat->getSize(sx, sy);
     winFlat->getRatio(rx, ry);
-    axisY->createAxe(0, sy*winFlat->getDT(), sy/ry*winFlat->getDT(), 3);
-    axisYR->createAxe(0, sy*winFlat->getDT(), sy/ry*winFlat->getDT(), 3);
+    axisY->createAxe(0, sy*winFlat->getDT(), result->Height, 3);
+    axisYR->createAxe(0, sy*winFlat->getDT(), result->Height, 3);
     auto seisCont = std::dynamic_pointer_cast<SeismicData>(dataContainer);
     if (!seisCont) {
-    axis->createAxe(0, sx, sx/rx, 0);
+    axis->createAxe(0, sx, result->Width, 0);
     }
     else if (seisCont->getType() == DataType::SWAN || seisCont->getType() == DataType::EN_SWAN) {
         auto frequens = seisCont->getFreq();
@@ -1282,17 +1283,18 @@ void TWindowContainer::saveScreenshot(System::UnicodeString path){
         intervals.Length=2;
         intervals[0].startValue = frequens.front();
         intervals[0].endValue = frequens.back();
-        intervals[0].sizeInPixels = viewPanel->Width;
+        intervals[0].sizeInPixels = result->Width;
         intervals[1].startValue = frequens.size();
         intervals[1].sizeInPixels = 0;
         axis->createAxe(intervals, 4);
     }
     else{
-        axis->createAxe(0, sx, sx/rx, 0);
+        axis->createAxe(0, sx, result->Width, 0);
     }
 
 
     fin->Canvas->Brush->Color = clInfoBk;
+    fin->Canvas->FillRect(Rect(0, 0, fin->Width, fin->Height));
     fin->Canvas->FillRect(Rect(0, 0, 50, result->Height));
     fin->Canvas->Draw(0, (image1->Visible ? 50 : 0) , axisY->getBitmap());
     // Рисуем верхнюю рамку (поверх левой в углу)
@@ -1302,7 +1304,6 @@ void TWindowContainer::saveScreenshot(System::UnicodeString path){
     fin->Canvas->Draw(50,50, result);
     fin->Canvas->Draw(result->Width+50, (image1->Visible ? 50 : 0), axisYR->getBitmap());
     updateAxis(true);
-//    delete mainBitmap;
 System::UnicodeString timestamp = FormatDateTime(L"yyyymmdd_hhnnss", TDateTime::CurrentDateTime());
     fin->SaveToFile(path + timestamp + L".bmp");
 }
