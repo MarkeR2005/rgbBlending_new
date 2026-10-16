@@ -1,0 +1,121 @@
+//---------------------------------------------------------------------------
+#include "vcl.h"
+#include "InterfacesWindow.h"
+#include "InterfacesData.h"
+#include "axis.h"
+#include "Shaders.h"
+#include "Structures.h"
+#include "ViewParams.h"
+#include "OverlayTransfer.h"
+#include <Vcl.ComCtrls.hpp>
+
+#ifndef SectionWindowContainerH
+#define SectionWindowContainerH
+//---------------------------------------------------------------------------
+
+enum class SectionWindowType {
+	NONE,
+	SEIS,
+	RGB
+};
+class TSectionWindowContainer : public TPanel
+{
+private:
+	TMenuItem *NameInfo;
+	TMenuItem *PosInfo;
+
+	TImage* image1;
+	TImage* image2;
+    TImage* image3;
+    TImage* image4;
+    TPanel* ratioPanel = nullptr;
+    TTrackBar* ratioXSlider = nullptr;
+    TTrackBar* ratioYSlider = nullptr;
+    TLabel* ratioXLabel = nullptr;
+    TLabel* ratioYLabel = nullptr;
+    TMenuItem* horizonStyleMenu = nullptr;
+    std::vector<TObject*> horizonStyleActions;
+
+	SectionWindowType type = SectionWindowType::NONE;
+	TAxis2* axis = new TAxis2(false);
+	TAxis2* axisY = new TAxis2(false);
+    TAxis2* axisYR = new TAxis2(false);
+	TPanel* viewPanel;
+    TButton* updateHorizonsButton = nullptr;
+    TTimer* rgbChangeTimer = nullptr;
+    TTimer* displayTimer = nullptr;
+    double pendingMouseX = 0.0, pendingMouseY = 0.0;
+    int appliedR = 0, appliedG = 0, appliedB = 0;
+    int pendingR = 0, pendingG = 0, pendingB = 0;
+    std::function<void(const std::vector<Horizon>&)> horizonsCallback;
+
+	int posx_ = 0;
+	int posy_ = 0;
+
+    void getPos();
+    void scheduleDisplay(double x, double y);
+    void __fastcall ApplyDisplayCallback(TObject* Sender);
+    void __fastcall RatioChange(TObject* Sender);
+    void rebuildHorizonStyleMenu();
+
+	void showPopupMenu(int button, int action, int mode);
+
+    void useFunction(TObject* Sender);
+
+	std::map<TObject*, std::function<void()>> func;
+
+    std::function<void(int)> callback = [](int p){};
+    std::function<void(int, int, std::string)> callbackDisp;
+protected:
+	std::unique_ptr<IWindow> window;
+	std::shared_ptr<ColorManager> colorManager = std::make_shared<ColorManager>();
+	std::shared_ptr<IBaseData> dataContainer;
+    System::UnicodeString basePath;
+
+	void __fastcall Resize(TObject* Sender);
+    void __fastcall UpdateHorizonsClick(TObject* Sender);
+    void __fastcall ApplyRgbChannels(TObject* Sender);
+	virtual void __fastcall Loaded();
+
+	void setupCallbacks();
+	void setupButtons();
+	void setupFlatButtons();
+	void setupSeisButtons();
+	void setupRgbButtons();
+	void createWindow(const std::shared_ptr<IBaseData>& newData,
+        OverlayMapping mapping = OverlayMapping::SameGrid, int sourceTrace = 0);
+public:
+    void setBasePath(System::UnicodeString value) {basePath = value;}
+    void setTraceCallback(std::function<void(int)> callback_){callback = callback_;};
+    void setDisplayCallback(std::function<void(int, int, std::string)> callback_){callbackDisp = callback_;};
+    bool setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb);
+    bool setHorizons(const std::vector<Horizon>& value);
+    bool setCrosses(const std::vector<Cross>& value);
+    bool getOverlayVisibility(bool& showH, bool& showC) const;
+    void toggleHorizons();
+    void toggleCrosses();
+    void panByPixels(int dx, int dy);
+    void pollOverlayEvents();
+	static std::vector<TSectionWindowContainer*> instances_;
+	int getFreqSize();
+    float getFreqByIndex(int idx);
+    void setViewParams(viewParams params);
+	TPopupMenu *FPopupMenu = new TPopupMenu(this);
+	void updateAxis(bool reEval);
+	static void __fastcall emitToAll();
+	void __fastcall LockClick(TObject* Sender);
+	__fastcall TSectionWindowContainer(TComponent* Owner);
+	__fastcall ~TSectionWindowContainer();
+	void initialize2D(const std::shared_ptr<IBaseData>& data);
+	void addButton(std::string caption, std::function<void()> function);
+    void changePalette();
+    void changeShader(GLuint shaderProgram);
+	TMenuItem*	syncButton;
+    void saveFile(std::wstring path);
+	void saveScreenshot(System::UnicodeString path);
+    void SaveHorizon(const std::wstring& filename, const std::wstring& fileext);
+	void LoadHorizon(const std::wstring& filename, const std::wstring& fileext);
+    void checkAxis(bool left, bool top, bool right);
+};
+
+#endif

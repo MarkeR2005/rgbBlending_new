@@ -3,7 +3,7 @@
 #include <vcl.h>
 #pragma hdrstop
 
-#include "UnitFormUniversal.h"
+#include "UnitFormSection2D.h"
 #include "Reader.h"
 #include "DataMath.h"
 #include "Dialog.h"
@@ -13,9 +13,9 @@
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 #pragma resource "*.dfm"
-TFormUniversal *FormUniversal;
+TFormSection2D *FormSection2D;
 //---------------------------------------------------------------------------
-__fastcall TFormUniversal::TFormUniversal(TComponent* Owner, System::UnicodeString path_)
+__fastcall TFormSection2D::TFormSection2D(TComponent* Owner, System::UnicodeString path_)
 	: TForm(Owner), path(path_)
 {
     Caption=path_;
@@ -30,19 +30,27 @@ __fastcall TFormUniversal::TFormUniversal(TComponent* Owner, System::UnicodeStri
 	SaveDialog2->FileName = "MyHorizon.txt";
 
 
-	windowContainer = new TWindowContainer(this);
+	windowContainer = new TSectionWindowContainer(this);
+    windowContainer->setBasePath(path_);
 	windowContainer->Parent = this;
 	windowContainer->Align = alClient;
+    ShowHorizons->Enabled = false;
+    ShowCrosses->Enabled = false;
+    overlayEventsTimer = new TTimer(this);
+    overlayEventsTimer->Interval = 30;
+    overlayEventsTimer->OnTimer = PollOverlayEvents;
+    overlayEventsTimer->Enabled = true;
 	OnClose=FormClose;
 }
 //---------------------------------------------------------------------------
-void __fastcall TFormUniversal::FormClose(TObject *Sender, TCloseAction &Action)
+void __fastcall TFormSection2D::FormClose(TObject *Sender, TCloseAction &Action)
 {
+if (overlayEventsTimer) overlayEventsTimer->Enabled = false;
 Free();
 }
 //---------------------------------------------------------------------------
 //---------------------------------------------------------------------------
-void __fastcall TFormUniversal::OpenAsClick(TObject *Sender)
+void __fastcall TFormSection2D::OpenAsClick(TObject *Sender)
 {
 //	if (OpenDialog1->Execute())
 //	{
@@ -104,7 +112,7 @@ void __fastcall TFormUniversal::OpenAsClick(TObject *Sender)
 //	}
 }
 //---------------------------------------------------------------------------
-void __fastcall TFormUniversal::SaveAsF(TObject *Sender)
+void __fastcall TFormSection2D::SaveAsF(TObject *Sender)
 {
 	std::string name;
 	TAbstractDialog* dialog = new TAbstractDialog(nullptr);
@@ -154,7 +162,7 @@ void __fastcall TFormUniversal::SaveAsF(TObject *Sender)
 //	}
 }
 //---------------------------------------------------------------------------
-void __fastcall TFormUniversal::SaveAsHorF(TObject *Sender)
+void __fastcall TFormSection2D::SaveAsHorF(TObject *Sender)
 {
 	if (windowContainer==nullptr) {
 		return;
@@ -171,7 +179,7 @@ void __fastcall TFormUniversal::SaveAsHorF(TObject *Sender)
 	}
 }
 //---
-void __fastcall TFormUniversal::OpenAsHorF(TObject *Sender)
+void __fastcall TFormSection2D::OpenAsHorF(TObject *Sender)
 {
 	if (windowContainer==nullptr) {
 		return;
@@ -189,7 +197,7 @@ void __fastcall TFormUniversal::OpenAsHorF(TObject *Sender)
 }
 
 
-void __fastcall TFormUniversal::ScrollBar1Change(TObject *Sender)
+void __fastcall TFormSection2D::ScrollBar1Change(TObject *Sender)
 {
 	if (windowContainer==nullptr) {
 		return;
@@ -203,7 +211,7 @@ void __fastcall TFormUniversal::ScrollBar1Change(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 
-void __fastcall TFormUniversal::ContrastBarClick(TObject *Sender)
+void __fastcall TFormSection2D::ContrastBarClick(TObject *Sender)
 {
 	ContrastBar->Checked = !ContrastBar->Checked;
 	Panel1->Enabled = ContrastBar->Checked;
@@ -211,7 +219,7 @@ void __fastcall TFormUniversal::ContrastBarClick(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 
-void __fastcall TFormUniversal::ControlPanelClick(TObject *Sender)
+void __fastcall TFormSection2D::ControlPanelClick(TObject *Sender)
 {
 	ControlPanel->Checked = !ControlPanel->Checked;
 	Panel2->Enabled = ControlPanel->Checked;
@@ -221,7 +229,7 @@ void __fastcall TFormUniversal::ControlPanelClick(TObject *Sender)
 
 
 
-void __fastcall TFormUniversal::CheckBoxBClick(TObject *Sender)
+void __fastcall TFormSection2D::CheckBoxBClick(TObject *Sender)
 {
 	if (windowContainer==nullptr) {
 		return;
@@ -235,7 +243,7 @@ void __fastcall TFormUniversal::CheckBoxBClick(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 
-void __fastcall TFormUniversal::ScrollBarRChange(TObject *Sender)
+void __fastcall TFormSection2D::ScrollBarRChange(TObject *Sender)
 {
 	if (windowContainer==nullptr) {
 		return;
@@ -256,7 +264,7 @@ void __fastcall TFormUniversal::ScrollBarRChange(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 
-void __fastcall TFormUniversal::LeftAxeClick(TObject *Sender)
+void __fastcall TFormSection2D::LeftAxeClick(TObject *Sender)
 {
 	if (windowContainer==nullptr) {
 		return;
@@ -264,7 +272,7 @@ void __fastcall TFormUniversal::LeftAxeClick(TObject *Sender)
 	LeftAxe->Checked = !LeftAxe->Checked;
 	windowContainer->checkAxis(LeftAxe->Checked,TopAxe->Checked, RightAxe->Checked);
 }
-void __fastcall TFormUniversal::TopAxeClick(TObject *Sender)
+void __fastcall TFormSection2D::TopAxeClick(TObject *Sender)
 {
 	if (windowContainer==nullptr) {
 		return;
@@ -274,18 +282,7 @@ void __fastcall TFormUniversal::TopAxeClick(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 
-void __fastcall TFormUniversal::SetRatio1Click(TObject *Sender)
-{
-	if (windowContainer==nullptr) {
-		return;
-	}
-    windowContainer->setRatio();
-}
-//---------------------------------------------------------------------------
-
-//---------------------------------------------------------------------------
-
-void __fastcall TFormUniversal::Changepalette1Click(TObject *Sender)
+void __fastcall TFormSection2D::Changepalette1Click(TObject *Sender)
 {
 	if (windowContainer==nullptr) {
 		return;
@@ -294,7 +291,7 @@ void __fastcall TFormUniversal::Changepalette1Click(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 
-void __fastcall TFormUniversal::Changeshader1Click(TObject *Sender)
+void __fastcall TFormSection2D::Changeshader1Click(TObject *Sender)
 {
 	if (OpenDialog1->Execute())
 	{
@@ -321,7 +318,7 @@ void __fastcall TFormUniversal::Changeshader1Click(TObject *Sender)
 //---------------------------------------------------------------------------
 
 
-void __fastcall TFormUniversal::SaveScreenShot1Click(TObject *Sender)
+void __fastcall TFormSection2D::SaveScreenShot1Click(TObject *Sender)
 {
     if (windowContainer==nullptr) {
         return;
@@ -330,7 +327,7 @@ void __fastcall TFormUniversal::SaveScreenShot1Click(TObject *Sender)
 }
 //---------------------------------------------------------------------------
 
-void __fastcall TFormUniversal::RightAxeClick(TObject *Sender)
+void __fastcall TFormSection2D::RightAxeClick(TObject *Sender)
 {
     if (windowContainer==nullptr) {
 		return;
@@ -341,3 +338,42 @@ void __fastcall TFormUniversal::RightAxeClick(TObject *Sender)
 //---------------------------------------------------------------------------
 
 
+
+void __fastcall TFormSection2D::PollOverlayEvents(TObject*) {
+    if (!windowContainer) return;
+    windowContainer->pollOverlayEvents();
+    bool horizons = false, crosses = false;
+    const bool available = windowContainer->getOverlayVisibility(horizons, crosses);
+    ShowHorizons->Enabled = available;
+    ShowCrosses->Enabled = available;
+    if (available) {
+        ShowHorizons->Checked = horizons;
+        ShowCrosses->Checked = crosses;
+    }
+}
+void __fastcall TFormSection2D::ShowHorizonsClick(TObject*) {
+    if (windowContainer) windowContainer->toggleHorizons();
+    PollOverlayEvents(nullptr);
+}
+void __fastcall TFormSection2D::ShowCrossesClick(TObject*) {
+    if (windowContainer) windowContainer->toggleCrosses();
+    PollOverlayEvents(nullptr);
+}
+void __fastcall TFormSection2D::FormKeyDown(TObject*, WORD &Key, TShiftState Shift) {
+    if (Shift.Contains(ssCtrl) || Shift.Contains(ssAlt)) return;
+    int dx = 0, dy = 0;
+    if (Key == VK_LEFT) dx = -32;
+    if (Key == VK_RIGHT) dx = 32;
+    if (Key == VK_UP) dy = -32;
+    if (Key == VK_DOWN) dy = 32;
+    if ((dx || dy) && windowContainer) {
+        windowContainer->panByPixels(dx, dy);
+        Key = 0;
+    } else if (Key == 'H' && ShowHorizons->Enabled) {
+        ShowHorizonsClick(nullptr);
+        Key = 0;
+    } else if (Key == 'C' && ShowCrosses->Enabled) {
+        ShowCrossesClick(nullptr);
+        Key = 0;
+    }
+}

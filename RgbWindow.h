@@ -9,6 +9,9 @@
 #include <Windows.h>
 #include "BaseWindow.h"
 #include "Structures.h"
+#include <memory>
+#include <list>
+class RgbData;
 #ifndef RgbWindowH
 #define RgbWindowH
 //---------------------------------------------------------------------------
@@ -20,7 +23,9 @@ class RgbWindow : public FlatWindow, public IRgbWindow
 	//--
 	void initWindow(TPanel* parent) override;
 	//--
-	void initTexture(const std::vector<bitMap>& textures);
+	void initData(std::shared_ptr<RgbData> data);
+    bool hasCachedLayers(int r, int g, int b) const;
+    bool getPixelComponents(int x, int y, int& r, int& g, int& b) const;
 	//--
 	void renderWindow() override;
 
@@ -41,7 +46,15 @@ class RgbWindow : public FlatWindow, public IRgbWindow
 
 	GLuint indexTexture = 0;
 	//
-	int size;
+	std::shared_ptr<RgbData> source;
+	bool textureDirty = true;
+    int allocatedWidth = 0, allocatedHeight = 0;
+    struct CachedLayer { int index; std::shared_ptr<bitMap> bitmap; };
+    std::list<CachedLayer> layerCache;
+    size_t cachedBytes = 0;
+    std::vector<uint8_t> compositePixels;
+    std::shared_ptr<bitMap> loadLayer(int index);
+	void updateComposite();
 };
 #endif
 

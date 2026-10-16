@@ -31,6 +31,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	virtual void render();
 	virtual void renderHighlights();
 	virtual void renderHorizons();
+    virtual void renderCrosses();
 	virtual void postRender();
 
 	virtual void renderWindow() override;
@@ -43,7 +44,22 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	float getZoom() override {return zoom;};
 	void getSize(int& w, int& h) override {w = width;h = height;};
 	GLFWwindow* getWindow() override;
-	std::vector<float> getHorizon() override {return horizon;};
+	std::vector<float> getHorizon() override;
+    const std::vector<Horizon>& getHorizons() const {return horizons;}
+    const std::vector<Cross>& getCrosses() const {return crosses;}
+    void setHorizons(const std::vector<Horizon>& value);
+    void setCrosses(const std::vector<Cross>& value);
+    std::string hoveredOverlay(double screenX, double screenY) const;
+    void setHorizonsVisible(bool value) {showHorizons = value; renderWindow();}
+    void setCrossesVisible(bool value) {showCrosses = value; renderWindow();}
+    bool horizonsVisible() const {return showHorizons;}
+    bool crossesVisible() const {return showCrosses;}
+    void setHorizonEditing(bool value) {isDrawing = value; firstPoint = true;}
+    bool horizonEditing() const {return isDrawing;}
+    void selectHorizon(size_t index, const std::wstring& name = L"");
+    bool setHorizonColor(size_t index, unsigned char r, unsigned char g, unsigned char b);
+    bool setHorizonNegative(size_t index);
+    bool setHorizonContrast(size_t index, bool value);
 	float getDT() override {return dT;};
 	//Setters
 	virtual void setOffset(float ox, float oy) override {offsetX = ox;offsetY = oy;};
@@ -62,6 +78,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	void handleCursorPosMoveCallback(double _xpos, double _ypos);
 	void handleMouseButtonCallback(int button, int action, int mods);
 	void handleScrollCallback(double offsetx, double offsety);
+    void panByPixels(int dx, int dy);
 	void processEvents();
 	//AccesibleVariables
 
@@ -75,6 +92,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	void setCursorEnterCallback(std::function<void(int)> callback) override;
 		//--
 	protected:
+    bool blackCrosses = false;
 	bool isSync = false;
     bool isDrawing = false;
 	bool firstPoint = true;
@@ -95,7 +113,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	//--
     float dT = 1.0f;
 
-	int Wwidth, Wheight;
+	int Wwidth = 1, Wheight = 1;
 
 	std::function<void(int, int, int)> mouseButtonCallback = [](int button, int action, int mods){};
 	std::function<void(double, double)> cursorPosCallback = [](double x, double y){};
@@ -104,7 +122,21 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 
 
 	private:
-	int horNum = 0;
+	size_t horNum = 0;
+    bool showHorizons = true, showCrosses = true;
+    std::vector<Horizon> horizons;
+    std::vector<Cross> crosses;
+    struct TextLabel { GLuint texture; int width; int height; };
+    std::vector<TextLabel> crossLabels, horizonLabels;
+    std::vector<std::pair<float, float>> visibleHorizonAnchors;
+    GLuint labelProgram = 0, labelVAO = 0, labelVBO = 0;
+    void clearLabels(std::vector<TextLabel>& labels);
+    TextLabel makeLabel(const std::wstring& name);
+    void updateHorizonLabels();
+    void drawLabel(const TextLabel& label, float x, float y);
+    void renderCrossLabels();
+    void renderHorizonLabels(bool outline = false, float dx = 0.0f, float dy = 0.0f);
+    void updateVisibleHorizonAnchors(const std::vector<std::vector<std::vector<float>>>& geometry);
 	std::vector<point2> highlighted_points = {};
 	//static std::vector<FlatWindow*> instances_;
 
@@ -124,22 +156,22 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	//--
 
 	bool isDragging = false;
+    bool eraseStroke = false;
+    bool screenshotRendering = false;
 	//--
 	double lastMouseX = 0.0;
 	//--
 	double lastMouseY = 0.0;
-    int lastPosX = 0, lastPosY = 0;
+    int lastPosX = 0;
+    float lastPosY = 0.0f;
     	//--
 	float contrast = 1.0f;
 
 	//--
 	GLuint highlightProgram = 0, horizonProgram = 0;
 
-	std::vector<float> horizon = {};
 	void clampOffsets();
 	// Обновление одной точки
-	 void updateGPUData();
-	 void updateGPUPoint(int indexL, int indexR);
 	 void addPoint(float x1, float y1);
 	 void interpolateBetweenPoints(float x1, float y1, float x2, float y2);
 };

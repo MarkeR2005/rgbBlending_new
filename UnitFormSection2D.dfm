@@ -1,7 +1,7 @@
-object FormUniversal: TFormUniversal
+object FormSection2D: TFormSection2D
   Left = 0
   Top = 0
-  Caption = 'FormUniversal'
+  Caption = 'FormSection2D'
   ClientHeight = 423
   ClientWidth = 582
   Color = clBtnFace
@@ -12,6 +12,8 @@ object FormUniversal: TFormUniversal
   Font.Style = []
   Menu = MainMenu1
   OnClose = FormClose
+  KeyPreview = True
+  OnKeyDown = FormKeyDown
   TextHeight = 15
   object Panel1: TPanel
     Left = 0
@@ -241,6 +243,16 @@ object FormUniversal: TFormUniversal
     end
     object View1: TMenuItem
       Caption = 'View'
+      object ShowHorizons: TMenuItem
+        Caption = 'Horizons (H)'
+        Checked = True
+        OnClick = ShowHorizonsClick
+      end
+      object ShowCrosses: TMenuItem
+        Caption = 'Crosses (C)'
+        Checked = True
+        OnClick = ShowCrossesClick
+      end
       object ContrastBar: TMenuItem
         Caption = 'ContrastBar'
         OnClick = ContrastBarClick
@@ -275,10 +287,6 @@ object FormUniversal: TFormUniversal
         Enabled = False
         Visible = False
         OnClick = Changeshader1Click
-      end
-      object SetRatio1: TMenuItem
-        Caption = 'SetRatio'
-        OnClick = SetRatio1Click
       end
     end
   end

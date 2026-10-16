@@ -46,6 +46,7 @@ public:
 	virtual float getDT() override {return dT;};
 	std::vector<float> getFreqs(){return frequencies;};
 	std::vector<bitMap> getTexture();
+	bitMap getTexture(int filterIndex);
 	//--------------------------------------------------------------------------
 	//File
 	void saveFile(const std::wstring& loc);

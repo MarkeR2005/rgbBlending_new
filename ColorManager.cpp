@@ -158,6 +158,6 @@ bitMap ColorManager::getTexture(const std::vector<std::vector<float>>& dat){
 			color[output_offset + static_cast<size_t>(s) * width] = color_val;
 		}
 	}
-	return bitMap(color, height, width);
+	return bitMap(std::move(color), height, width);
 }
 
