@@ -46,6 +46,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	GLFWwindow* getWindow() override;
 	std::vector<float> getHorizon() override;
     const std::vector<Horizon>& getHorizons() const {return horizons;}
+    const std::vector<Cross>& getCrosses() const {return crosses;}
     void setHorizons(const std::vector<Horizon>& value);
     void setCrosses(const std::vector<Cross>& value);
     std::string hoveredOverlay(double screenX, double screenY) const;

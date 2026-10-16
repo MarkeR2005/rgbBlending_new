@@ -257,6 +257,13 @@
             <DependentOn>Structures.h</DependentOn>
             <BuildOrder>23</BuildOrder>
         </CppCompile>
+        <CppCompile Include="UnitFormVolume.cpp">
+            <VirtualFolder>{F35ACD7E-016A-4E8E-8A21-05004CE80EF2}</VirtualFolder>
+            <Form>FormVolume</Form>
+            <FormType>dfm</FormType>
+            <DependentOn>UnitFormVolume.h</DependentOn>
+            <BuildOrder>31</BuildOrder>
+        </CppCompile>
         <CppCompile Include="UnitFormUniversal.cpp">
             <VirtualFolder>{F35ACD7E-016A-4E8E-8A21-05004CE80EF2}</VirtualFolder>
             <Form>FormUniversal</Form>
@@ -310,6 +317,7 @@
             <BuildOrder>25</BuildOrder>
             <IgnorePath>true</IgnorePath>
         </LibFiles>
+        <FormResources Include="UnitFormVolume.dfm"/>
         <FormResources Include="UnitFormUniversal.dfm"/>
         <FormResources Include="UnitLoading.dfm"/>
         <FormResources Include="UnitSeismic3d.dfm"/>

@@ -86,7 +86,7 @@ public:		// User declarations
     System::UnicodeString getPath() {return path;};
 	__fastcall TFormUniversal(TComponent* Owner, System::UnicodeString path);
 	void __fastcall initFromData(std::shared_ptr<IBaseData> data){
-		windowContainer->initialize(data);
+		windowContainer->initialize2D(data);
 		int fr_size = windowContainer->getFreqSize();
 		if (fr_size < 0) {
 			throw "Bad data";
@@ -95,17 +95,6 @@ public:		// User declarations
 		ScrollBarG->Max = std::max(fr_size-1, 0);
 		ScrollBarB->Max = std::max(fr_size-1, 0);
 	}
-    void __fastcall initForCube(System::UnicodeString path){
-    windowContainer->initialize();
-    windowContainer->setFile(path.c_str());
-    int fr_size = windowContainer->getFreqSize();
-		if (fr_size < 0) {
-			throw "Bad data";
-		}
-		ScrollBarR->Max = std::max(fr_size-1, 0);
-		ScrollBarG->Max = std::max(fr_size-1, 0);
-		ScrollBarB->Max = std::max(fr_size-1, 0);
-    };
     bool setHorizons(const std::vector<Horizon>& value){return windowContainer->setHorizons(value);}
     bool setCrosses(const std::vector<Cross>& value){return windowContainer->setCrosses(value);}
     bool setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb){

@@ -246,7 +246,7 @@ void __fastcall TWindowContainer::UpdateHorizonsClick(TObject*) {
         horizonsCallback(snapshot);
     }
 }
-void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
+void TWindowContainer::initialize2D(const std::shared_ptr<IBaseData>& data){
     rgbChangeTimer->Enabled = false;
     displayTimer->Enabled = false;
     appliedR = appliedG = appliedB = pendingR = pendingG = pendingB = 0;
@@ -305,7 +305,7 @@ void TWindowContainer::initialize(const std::shared_ptr<IBaseData>& data){
 
 
 
-void TWindowContainer::initialize(){
+void TWindowContainer::initializeVolume(){
     rgbChangeTimer->Enabled = false;
 	std::unique_ptr<ViewportWindow>window_ = std::make_unique<ViewportWindow>();
 	window_->initWindow(viewPanel);
@@ -643,20 +643,46 @@ void TWindowContainer::setupCallbacks()
 	}
 }
 
-void TWindowContainer::createWindow(const std::shared_ptr<IBaseData>& newData){
-	TFormUniversal* form = new TFormUniversal (Application->MainForm, dynamic_cast<TFormUniversal*>(Parent)->getPath());
-    form->setTraceCallback(callback);
-	form -> Show();
-	form -> initFromData(std::move(newData));
-}
-void TWindowContainer::createWindow(const std::shared_ptr<IBaseData>& newData, int pos){
-	TFormUniversal* form = new TFormUniversal (Application->MainForm, dynamic_cast<TFormUniversal*>(Parent)->getPath());
-    auto clb = [&](int input){
-        callback(pos);
-    };
-    form->setTraceCallback(clb);
-	form -> Show();
-	form -> initFromData(std::move(newData));
+void TWindowContainer::createWindow(const std::shared_ptr<IBaseData>& newData,
+    OverlayMapping mapping, int sourceTrace)
+{
+    if (!newData) return;
+    const auto source = dynamic_cast<FlatWindow*>(window.get());
+    auto sourceSeis = std::dynamic_pointer_cast<SeismicData>(dataContainer);
+    auto sourceRgb = std::dynamic_pointer_cast<RgbData>(dataContainer);
+    auto targetSeis = std::dynamic_pointer_cast<SeismicData>(newData);
+    auto targetRgb = std::dynamic_pointer_cast<RgbData>(newData);
+    const int sourceWidth = sourceSeis ? sourceSeis->getSize().x
+        : sourceRgb ? sourceRgb->getSize().x : 0;
+    const int targetWidth = targetSeis ? targetSeis->getSize().x
+        : targetRgb ? targetRgb->getSize().x : 0;
+
+    TransferredOverlays overlays;
+    if (source && dataContainer && sourceWidth && targetWidth &&
+        std::abs(dataContainer->getDT() - newData->getDT()) < 0.0001f)
+        overlays = transferOverlays(source->getHorizons(), source->getCrosses(),
+            sourceWidth, targetWidth, mapping, sourceTrace);
+
+    std::unique_ptr<TFormUniversal> form(new TFormUniversal(Application->MainForm, basePath));
+    if (mapping == OverlayMapping::SameGrid)
+        form->setTraceCallback(callback);
+    else
+        form->setTraceCallback([sourceCallback = callback, sourceTrace](int) {
+            sourceCallback(sourceTrace);
+        });
+    if (mapping == OverlayMapping::SameGrid)
+        form->setDisplayCallback(callbackDisp);
+    else
+        form->setDisplayCallback([sourceDisplay = callbackDisp, sourceTrace](
+            int, int sample, std::string info) {
+            if (sourceDisplay) sourceDisplay(sourceTrace, sample, std::move(info));
+        });
+    form->initFromData(newData);
+    form->setHorizons(overlays.horizons);
+    form->setCrosses(overlays.crosses);
+    form->setHorizonsCallback(horizonsCallback);
+    form->Show();
+    form.release();
 }
 
 void TWindowContainer::setupFlatButtons(){
@@ -753,7 +779,7 @@ createWindow(newData);
 		{
 			getPos();
 			std::shared_ptr<IBaseData> newData = DataCalculator::getTrace(dataContainer, posx_);
-createWindow(newData, posx_);
+createWindow(newData, OverlayMapping::Trace, posx_);
 //                    ShowMessage("ok");
 		}
 	});
@@ -793,7 +819,7 @@ createWindow(newData);
 		dialog->AddInput<int>("Ўирина фильтра", stnFilterWindow);
 		if (dialog->Execute() && dialog->ContinuePressed) {
 			std::shared_ptr<IBaseData> newData = DataCalculator::getSwan(std::dynamic_pointer_cast<SeismicData>(dataContainer), posx_, stnFreqStart, stnFreqStop, stnNumFilters, stnFilterWindow);
-createWindow(newData, posx_);
+createWindow(newData, OverlayMapping::Spectrum, posx_);
 		}
 		delete dialog;
 		}
@@ -807,7 +833,7 @@ createWindow(newData, posx_);
 		dialog->AddInput<int>("Ўирина фильтра", stnFilterWindow);
 		if (dialog->Execute() && dialog->ContinuePressed) {
 			std::shared_ptr<IBaseData> newData = DataCalculator::getSwanRGB(std::dynamic_pointer_cast<SeismicData>(dataContainer), posx_, stnFreqStart, stnFreqStop, stnNumFilters, stnFilterWindow);
-createWindow(newData, posx_);
+createWindow(newData, OverlayMapping::Spectrum, posx_);
 		}
 		delete dialog;
 		}
@@ -836,7 +862,7 @@ createWindow(newData);
 		dialog->AddInput<int>("Ўирина окна сглаживани€", stnTWindow);
 		if (dialog->Execute() && dialog->ContinuePressed) {
 			std::shared_ptr<IBaseData> newData = DataCalculator::SwanToRGB(std::dynamic_pointer_cast<SeismicData>(dataContainer), stnTWindow);
-			createWindow(newData);
+			createWindow(newData, OverlayMapping::Trace, posx_);
 		}
 		delete dialog;
 		}

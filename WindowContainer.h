@@ -5,6 +5,7 @@
 #include "axis.h"
 #include "Shaders.h"
 #include "Structures.h"
+#include "OverlayTransfer.h"
 #include <Vcl.ComCtrls.hpp>
 
 #ifndef WindowContainerH
@@ -77,6 +78,7 @@ protected:
 	std::shared_ptr<ColorManager> colorManager = std::make_shared<ColorManager>();
 	std::shared_ptr<IBaseData> dataContainer;
 	std::wstring fileName;
+    System::UnicodeString basePath;
 
 	void __fastcall Resize(TObject* Sender);
     void __fastcall UpdateHorizonsClick(TObject* Sender);
@@ -89,9 +91,10 @@ protected:
 	void setupSeisButtons();
 	void setupRgbButtons();
 	void setupVolumButtons();
-	void createWindow(const std::shared_ptr<IBaseData>& newData);
-    void createWindow(const std::shared_ptr<IBaseData>& newData, int pos);
+	void createWindow(const std::shared_ptr<IBaseData>& newData,
+        OverlayMapping mapping = OverlayMapping::SameGrid, int sourceTrace = 0);
 public:
+    void setBasePath(System::UnicodeString value) {basePath = value;}
     void setTraceCallback(std::function<void(int)> callback_){callback = callback_;};
     void setDisplayCallback(std::function<void(int, int, std::string)> callback_){callbackDisp = callback_;};
     bool setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb);
@@ -112,8 +115,8 @@ public:
 	void __fastcall LockClick(TObject* Sender);
 	__fastcall TWindowContainer(TComponent* Owner);
 	__fastcall ~TWindowContainer();
-	void initialize(const std::shared_ptr<IBaseData>& data);
-	void initialize();
+	void initialize2D(const std::shared_ptr<IBaseData>& data);
+	void initializeVolume();
     void setFile(std::wstring fName) {fileName = fName;};
 	void addButton(std::string caption, std::function<void()> function);
     void changePalette();

@@ -11,6 +11,8 @@
 #include "RgbData.h"
 #include "Structures.h"
 #include "UnitFormUniversal.h"
+#include "UnitFormVolume.h"
+#include <memory>
 #include "ChooseForm.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -121,12 +123,12 @@ return data->getSize().x;
 
 TForm* __cdecl CreateRgbBlendingForm(System::UnicodeString path, std::function<void(int)> callback, std::function<void(int, int, std::string)> callbackDisplay){
 	try {
-		TChoose* choose = new TChoose(Application->MainForm);
+		std::unique_ptr<TChoose> choose(new TChoose(Application->MainForm));
 		choose->SetRGBPath(path);
         if (choose->Execute() && choose->execType!=0){
-            TFormUniversal* form = new TFormUniversal(Application->MainForm, path);
-			setTraceCallback(form, callback);
-            setDisplayCallback(form, callbackDisplay);
+            std::unique_ptr<TFormUniversal> form(new TFormUniversal(Application->MainForm, path));
+			setTraceCallback(form.get(), callback);
+            setDisplayCallback(form.get(), callbackDisplay);
             switch (choose->execType) {
             case 1:
             	{
@@ -149,6 +151,9 @@ TForm* __cdecl CreateRgbBlendingForm(System::UnicodeString path, std::function<v
                     std::shared_ptr<IBaseData> newData = std::make_shared<RgbData>(sd.get(), stnFreqStart, stnFreqStop, stnNumFilters, stnFilterWindow);
                     newData = DataCalculator::smoothT(newData, stnTWindow);
                     form -> initFromData(newData);
+                } else {
+                    delete dialog;
+                    return nullptr;
                 }
                 delete dialog;
                 break;
@@ -160,12 +165,10 @@ TForm* __cdecl CreateRgbBlendingForm(System::UnicodeString path, std::function<v
                 break;
                 }
             default:
-                ;
+                return nullptr;
             }
-            choose->Free();
-            return form;
+            return form.release();
         };
-        choose->Free();
         return nullptr;
 
 	} catch (...) {
@@ -174,50 +177,44 @@ TForm* __cdecl CreateRgbBlendingForm(System::UnicodeString path, std::function<v
 }
 
 TForm* __cdecl CreateRgbBlendingFormCube(System::UnicodeString path){
-	try {
-		TChoose* choose = new TChoose(Application->MainForm);
-		choose->SetRGBPath(path);
-        if (choose->Execute() && choose->execType!=0){
-            TFormUniversal* form = new TFormUniversal(Application->MainForm, path);
-            switch (choose->execType) {
-            case 1:
-                {
-                form -> initForCube(path+L".ibm");
-                break;
-                }
-            case 2:
-            	{
-            	TAbstractDialog* dialog = new TAbstractDialog(nullptr);
-                dialog->AddInput<float>("Начальная частота", stnFreqStart);
-                dialog->AddInput<float>("Конечная частота", stnFreqStop);
-                dialog->AddInput<int>("Число фильтров", stnNumFilters);
-                dialog->AddInput<int>("Ширина фильтра", stnFilterWindow);
-                if (dialog->Execute() && dialog->ContinuePressed) {
-                    calculateCube(path.c_str(), stnNumFilters, stnFreqStart, stnFreqStop, stnFilterWindow);
-                }
-                break;
-                }
-            case 3:
-                {
-                if(MessageDlg("Вы хотите конвертировать файл в slice-cube?",
-                   mtConfirmation,          // Тип: вопрос, предупреждение, ошибка...
-                   TMsgDlgButtons() << mbYes << mbNo, // Кнопки: Да и Нет
-                   0) == mrYes) {
-                        convertToSliceOrder((path+L"\\"+ExtractFileName(choose->getChosen())).c_str());
-                   }
-                form -> initForCube(choose->getChosen());
-                break;
-                }
-            default:
-                ;
-            }
-            return form;
-        };
-        choose->Free();
+    try {
+        std::unique_ptr<TChoose> choose(new TChoose(Application->MainForm));
+        choose->SetRGBPath(path);
+        if (!choose->Execute() || choose->execType == 0) return nullptr;
 
-        return nullptr;
-
-	} catch (...) {
-		throw "RGBBlending: UNKNOWN DATA ERROR";
-	}
+        System::UnicodeString cubeFile;
+        switch (choose->execType) {
+        case 1:
+            cubeFile = path + L".ibm";
+            break;
+        case 2: {
+            std::unique_ptr<TAbstractDialog> dialog(new TAbstractDialog(nullptr));
+            dialog->AddInput<float>("Start frequency", stnFreqStart);
+            dialog->AddInput<float>("Stop frequency", stnFreqStop);
+            dialog->AddInput<int>("Number of filters", stnNumFilters);
+            dialog->AddInput<int>("Filter window", stnFilterWindow);
+            if (!dialog->Execute() || !dialog->ContinuePressed) return nullptr;
+            calculateCube(path.c_str(), stnNumFilters, stnFreqStart,
+                stnFreqStop, stnFilterWindow);
+            cubeFile = path + L"\\" + IntToStr(stnNumFilters) + L"_" +
+                IntToStr(static_cast<int>(stnFreqStart)) + L"_" +
+                IntToStr(static_cast<int>(stnFreqStop)) + L".irgb";
+            break;
+        }
+        case 3:
+            cubeFile = choose->getChosen();
+            if (MessageDlg("Convert this cube to slice order?", mtConfirmation,
+                TMsgDlgButtons() << mbYes << mbNo, 0) == mrYes)
+                convertToSliceOrder((path + L"\\" + ExtractFileName(cubeFile)).c_str());
+            break;
+        default:
+            return nullptr;
+        }
+        if (!FileExists(cubeFile)) return nullptr;
+        std::unique_ptr<TFormVolume> form(new TFormVolume(Application->MainForm, path));
+        form->initForCube(cubeFile);
+        return form.release();
+    } catch (...) {
+        throw "RGBBlending: UNKNOWN DATA ERROR";
+    }
 }

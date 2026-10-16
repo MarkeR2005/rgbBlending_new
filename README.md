@@ -2,6 +2,22 @@
 
 Windows VCL/OpenGL module for seismic and RGB views. The existing cube/3D renderer uses its original texture array path.
 
+## Window layout
+
+`CreateRgbBlendingForm` opens a 2D section (`TFormUniversal`), while
+`CreateRgbBlendingFormCube` opens a separate volume form (`TFormVolume`).
+The volume form has its own RGB channel controls; 2D horizon, cross and axis
+controls belong to the section form. Opening a selected plane in the volume
+creates a 2D section. Cancelling either selection dialog returns `nullptr`.
+
+All derived 2D windows copy horizon names, colors, contrast settings and
+gaps, along with applicable crosses and callbacks. Smoothing, filters,
+energy, RGB and cluster views preserve the trace grid. A single trace selects
+the corresponding horizon ordinate and cross. A SWAN view repeats the
+selected horizon ordinate across its frequency axis; crosses are omitted
+because frequency columns are not traces. The source trace remains the
+coordinate sent to host callbacks for these selected trace views.
+
 ## 2D RGB memory use
 
 The 2D RGB window keeps the source `RgbData` in RAM. It converts only the three selected frequency filters through `ColorManager`, combines them into one RGB buffer and uploads a single `GL_RGB8` texture. Changing channel indices rebuilds that texture immediately for cached filters, or after a 250 ms pause in scrollbar input for uncached filters; changing visibility, contrast, zoom or pan uses the existing texture. Converted 8-bit filters are reused from an LRU cache capped at 128 MiB and eight filters. Repeated indices are converted once. The RGB staging buffer is reused across updates. A cold, uncached filter still requires conversion of its full image. The full frequency stack is no longer allocated as a 2D GPU texture array. The OpenGL maximum single texture dimension still applies.

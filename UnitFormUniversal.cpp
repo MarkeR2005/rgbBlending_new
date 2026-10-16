@@ -31,6 +31,7 @@ __fastcall TFormUniversal::TFormUniversal(TComponent* Owner, System::UnicodeStri
 
 
 	windowContainer = new TWindowContainer(this);
+    windowContainer->setBasePath(path_);
 	windowContainer->Parent = this;
 	windowContainer->Align = alClient;
     ShowHorizons->Enabled = false;
