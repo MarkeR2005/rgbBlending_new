@@ -3,20 +3,14 @@
 #pragma hdrstop
 #include "SeismicWindow.h"
 #include "RgbWindow.h"
-#include "ViewportWindow.h"
-#include "WindowContainer.h"
+#include "SectionWindowContainer.h"
 #include "SeismicData.h"
 #include "RgbData.h"
 #include "DataCalculator.h"
-#include "UnitFormUniversal.h"
+#include "UnitFormSection2D.h"
 #include "DialogWrapper.h"
-#include "Reader.h"
-#include "SeismicPlane.h"
-#include "RgbPlane.h"
 #include <Vcl.ComCtrls.hpp>
 #include <Vcl.Dialogs.hpp>
-#include <thread>
-#include <chrono>
 #include <cmath>
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -25,8 +19,8 @@
 
 
 
-std::vector<TWindowContainer*> TWindowContainer::instances_;
-__fastcall TWindowContainer::TWindowContainer(TComponent* Owner) : TPanel(Owner){
+std::vector<TSectionWindowContainer*> TSectionWindowContainer::instances_;
+__fastcall TSectionWindowContainer::TSectionWindowContainer(TComponent* Owner) : TPanel(Owner){
 	this->OnResize = Resize;
 	this->DoubleBuffered=true;
 
@@ -150,32 +144,32 @@ __fastcall TWindowContainer::TWindowContainer(TComponent* Owner) : TPanel(Owner)
 }
 
 
-void __fastcall TWindowContainer::Loaded(){};
-void __fastcall TWindowContainer::emitToAll(){
+void __fastcall TSectionWindowContainer::Loaded(){};
+void __fastcall TSectionWindowContainer::emitToAll(){
 	for (auto windowContainer : instances_) {
 		windowContainer->updateAxis(true);
 	}
 }
-void __fastcall TWindowContainer::LockClick(TObject* Sender){
+void __fastcall TSectionWindowContainer::LockClick(TObject* Sender){
 	syncButton->Checked = !syncButton->Checked;
 	auto SyncWindow = dynamic_cast<ISyncWindow*>(window.get());
 	if (SyncWindow) {
 	   SyncWindow->setSync(syncButton->Checked);
 	}
 }
-void TWindowContainer::addButton(std::string caption, std::function<void()> function){
+void TSectionWindowContainer::addButton(std::string caption, std::function<void()> function){
 	TMenuItem *item = new TMenuItem(FPopupMenu);
 	item->Caption = caption.c_str();
 	FPopupMenu->Items->Add(item);
 	func[item] = function;
 	item->OnClick=useFunction;
 }
-void TWindowContainer::useFunction(TObject* Sender){
+void TSectionWindowContainer::useFunction(TObject* Sender){
 if (auto sch = func.find(Sender); sch != func.end()) sch->second();
 Application->ProcessMessages();
 }
-void TWindowContainer::changePalette(){
-    if (type != WindowType::SEIS) {
+void TSectionWindowContainer::changePalette(){
+    if (type != SectionWindowType::SEIS) {
             return;
     }
     TAbstractDialog* dialog = new TAbstractDialog(nullptr);
@@ -194,59 +188,59 @@ void TWindowContainer::changePalette(){
 		}
 		delete dialog;
 }
-void TWindowContainer::changeShader(GLuint shaderProgram){
+void TSectionWindowContainer::changeShader(GLuint shaderProgram){
     IFlatWindow* flatWin = dynamic_cast<IFlatWindow*>(window.get());
     if (flatWin != nullptr) {
         flatWin->setShaderProgram(shaderProgram);
     }
 }
-bool TWindowContainer::setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb) {
+bool TSectionWindowContainer::setHorizonsCallback(std::function<void(const std::vector<Horizon>&)> cb) {
     if (!dynamic_cast<FlatWindow*>(window.get())) return false;
     horizonsCallback = std::move(cb);
     return true;
 }
-bool TWindowContainer::setHorizons(const std::vector<Horizon>& value) {
+bool TSectionWindowContainer::setHorizons(const std::vector<Horizon>& value) {
     FlatWindow* flat = dynamic_cast<FlatWindow*>(window.get());
     if (!flat) return false;
     flat->setHorizons(value);
     return true;
 }
-bool TWindowContainer::setCrosses(const std::vector<Cross>& value) {
+bool TSectionWindowContainer::setCrosses(const std::vector<Cross>& value) {
     FlatWindow* flat = dynamic_cast<FlatWindow*>(window.get());
     if (!flat) return false;
     flat->setCrosses(value);
     return true;
 }
-bool TWindowContainer::getOverlayVisibility(bool& showH, bool& showC) const {
+bool TSectionWindowContainer::getOverlayVisibility(bool& showH, bool& showC) const {
     auto* flat = dynamic_cast<FlatWindow*>(window.get());
     if (!flat) return false;
     showH = flat->horizonsVisible();
     showC = flat->crossesVisible();
     return true;
 }
-void TWindowContainer::toggleHorizons() {
+void TSectionWindowContainer::toggleHorizons() {
     auto* flat = dynamic_cast<FlatWindow*>(window.get());
     if (flat) flat->setHorizonsVisible(!flat->horizonsVisible());
 }
-void TWindowContainer::toggleCrosses() {
+void TSectionWindowContainer::toggleCrosses() {
     auto* flat = dynamic_cast<FlatWindow*>(window.get());
     if (flat) flat->setCrossesVisible(!flat->crossesVisible());
 }
-void TWindowContainer::panByPixels(int dx, int dy) {
+void TSectionWindowContainer::panByPixels(int dx, int dy) {
     if (auto* flat = dynamic_cast<FlatWindow*>(window.get())) flat->panByPixels(dx, dy);
 }
-void TWindowContainer::pollOverlayEvents() {
+void TSectionWindowContainer::pollOverlayEvents() {
     auto* flat = dynamic_cast<FlatWindow*>(window.get());
     if (flat && flat->getWindow()) glfwPollEvents();
 }
-void __fastcall TWindowContainer::UpdateHorizonsClick(TObject*) {
+void __fastcall TSectionWindowContainer::UpdateHorizonsClick(TObject*) {
     FlatWindow* flat = dynamic_cast<FlatWindow*>(window.get());
     if (flat && horizonsCallback) {
         const auto snapshot = flat->getHorizons();
         horizonsCallback(snapshot);
     }
 }
-void TWindowContainer::initialize2D(const std::shared_ptr<IBaseData>& data){
+void TSectionWindowContainer::initialize2D(const std::shared_ptr<IBaseData>& data){
     rgbChangeTimer->Enabled = false;
     displayTimer->Enabled = false;
     appliedR = appliedG = appliedB = pendingR = pendingG = pendingB = 0;
@@ -266,7 +260,7 @@ void TWindowContainer::initialize2D(const std::shared_ptr<IBaseData>& data){
 		window_->initIndexTexture(sData->getTexture());
         window_->setDT(sData->getDT()/1000.0f);
 		window = std::move(window_);
-		type = WindowType::SEIS;
+		type = SectionWindowType::SEIS;
 
 	}
 	else if (rData) {
@@ -275,10 +269,9 @@ void TWindowContainer::initialize2D(const std::shared_ptr<IBaseData>& data){
 			window_->setThin();
 		}
 		window_->initWindow(viewPanel);
-//        std::this_thread::sleep_for(std::chrono::seconds(1));
 		window_->initData(rData);
         window_->setDT(rData->getDT()/1000.0f);
-        type = WindowType::RGB;
+        type = SectionWindowType::RGB;
 		window = std::move(window_);
 	}
 	else {
@@ -305,77 +298,18 @@ void TWindowContainer::initialize2D(const std::shared_ptr<IBaseData>& data){
 
 
 
-void TWindowContainer::initializeVolume(){
-    rgbChangeTimer->Enabled = false;
-	std::unique_ptr<ViewportWindow>window_ = std::make_unique<ViewportWindow>();
-	window_->initWindow(viewPanel);
-//    seismicShader = createShaderProgram("volumetric", "seismic");
-//	rgbShader = createShaderProgram("volumetric", "rgb");
-		window_->setCamera(
-		glm::vec3(1000.0f, 0.0f, 1000.0f),  // позиция камеры
-		glm::vec3(0.0f, 0.0f, 0.0f),  // цель камеры
-		glm::vec3(0.0f, 1.0f, 0.0f)   // вектор "вверх"
-	);
-
-	window_->setPerspective(45.0f, 0.1f, 10000.0f);
-	window = std::move(window_);
-	type = WindowType::VOL;
-    updateHorizonsButton->Visible = false;
-    ratioPanel->Visible = false;
-	syncButton->Enabled=false;
-    syncButton->Visible=false;
-	setupCallbacks();
-    setupButtons();
-	window->resizeWindow(this->Width,this->Height);
-	updateAxis(true);
+int TSectionWindowContainer::getFreqSize(){
+    auto rgb = std::dynamic_pointer_cast<RgbData>(dataContainer);
+    if (rgb) return rgb->getSize().f;
+    return std::dynamic_pointer_cast<SeismicData>(dataContainer) ? 0 : -1;
 }
-int TWindowContainer::getFreqSize(){
-	if (std::dynamic_pointer_cast<SeismicData>(dataContainer)) {
-		return 0;
-	}
-	std::shared_ptr<RgbData> rd = std::dynamic_pointer_cast<RgbData>(dataContainer);
-	if (rd) {
-		return rd->getSize().f;
-	}
-    IVolumeWindow* wnd = dynamic_cast<IVolumeWindow*>(window.get());
-    if (wnd) {
-        if (ExtractFileExt(fileName.c_str()) == L".ibm") {
-            return 0;
-        }
-        else{
-        	std::vector<float> frequens;
-            size4 sz_ = readSizeRGB(fileName, frequens);
-            return sz_.filters;
-        }
-    }
-    if (!dataContainer) {
-		return -1;
-	}
-	return -2;
-}
-float TWindowContainer::getFreqByIndex(int idx){
-	if (idx < 0 || idx > getFreqSize()-1) {
-		return -1;
-	}
-	std::shared_ptr<RgbData> rd = std::dynamic_pointer_cast<RgbData>(dataContainer);
-	if (rd) {
-		return rd->getFreqs()[idx];
-	}
-    IVolumeWindow* wnd = dynamic_cast<IVolumeWindow*>(window.get());
-    if (wnd) {
-        if (ExtractFileExt(fileName.c_str()) == L".ibm") {
-            return -1;
-        }
-        else{
-            std::vector<float> frequens;
-            size4 sz_ = readSizeRGB(fileName, frequens);
-            return frequens[idx];
-        }
-    }
-	return -2;
+float TSectionWindowContainer::getFreqByIndex(int idx){
+    auto rgb = std::dynamic_pointer_cast<RgbData>(dataContainer);
+    if (!rgb || idx < 0 || idx >= rgb->getSize().f) return -1.0f;
+    return rgb->getFreqs()[idx];
 }
 
-__fastcall TWindowContainer::~TWindowContainer(){
+__fastcall TSectionWindowContainer::~TSectionWindowContainer(){
     if (rgbChangeTimer) rgbChangeTimer->Enabled = false;
     if (displayTimer) displayTimer->Enabled = false;
     auto it = std::find(instances_.begin(), instances_.end(), this);
@@ -391,7 +325,7 @@ __fastcall TWindowContainer::~TWindowContainer(){
 }
 
 
-void __fastcall TWindowContainer::Resize(TObject* Sender){
+void __fastcall TSectionWindowContainer::Resize(TObject* Sender){
     if (ratioPanel) ratioPanel->Top = Height-ratioPanel->Height;
 	if (!window) {
 		return;
@@ -399,7 +333,7 @@ void __fastcall TWindowContainer::Resize(TObject* Sender){
 	window->resizeWindow(viewPanel->Width, viewPanel->Height);
 	updateAxis(true);
 }
-void __fastcall TWindowContainer::ApplyRgbChannels(TObject*) {
+void __fastcall TSectionWindowContainer::ApplyRgbChannels(TObject*) {
     rgbChangeTimer->Enabled = false;
     auto* rgb = dynamic_cast<RgbWindow*>(window.get());
     if (!rgb) return;
@@ -407,10 +341,9 @@ void __fastcall TWindowContainer::ApplyRgbChannels(TObject*) {
     appliedR = pendingR; appliedG = pendingG; appliedB = pendingB;
     rgb->renderWindow();
 }
-void TWindowContainer::setViewParams(viewParams params){
+void TSectionWindowContainer::setViewParams(viewParams params){
 	IRgbWindow* wd = dynamic_cast<IRgbWindow*>(window.get());
 	FlatWindow* wd1 = dynamic_cast<FlatWindow*>(window.get());
-    IVolumeWindow* wd2 = dynamic_cast<IVolumeWindow*>(window.get());
 	if (wd != nullptr) {
         wd->setView(params.isR, params.isG, params.isB);
         pendingR = params.r; pendingG = params.g; pendingB = params.b;
@@ -421,10 +354,6 @@ void TWindowContainer::setViewParams(viewParams params){
 	if (wd1 != nullptr) {
 		wd1->setContrast(params.contrast);
 	}
-    if (wd2 != nullptr) {
-		wd2->setChannels(params.r,params.g,params.b);
-		wd2->setChannelEnabled(params.isR, params.isG, params.isB);
-	}
     auto* rgb = dynamic_cast<RgbWindow*>(window.get());
     if (rgb && rgbChangeTimer->Enabled &&
         rgb->hasCachedLayers(pendingR, pendingG, pendingB)) {
@@ -433,7 +362,7 @@ void TWindowContainer::setViewParams(viewParams params){
         window->renderWindow();
     }
 }
-void __fastcall TWindowContainer::RatioChange(TObject*) {
+void __fastcall TSectionWindowContainer::RatioChange(TObject*) {
     auto* flat = dynamic_cast<FlatWindow*>(window.get());
     if (!flat || !ratioXSlider || !ratioYSlider) return;
     const float rx = std::pow(10.0f, ratioXSlider->Position/10.0f);
@@ -446,7 +375,7 @@ void __fastcall TWindowContainer::RatioChange(TObject*) {
     flat->renderWindow();
 }
 
-void TWindowContainer::rebuildHorizonStyleMenu() {
+void TSectionWindowContainer::rebuildHorizonStyleMenu() {
     if (!horizonStyleMenu) return;
     for (auto* action : horizonStyleActions) func.erase(action);
     horizonStyleActions.clear();
@@ -494,7 +423,7 @@ void TWindowContainer::rebuildHorizonStyleMenu() {
     }
 }
 
-void TWindowContainer::showPopupMenu(int button, int action, int mode)
+void TSectionWindowContainer::showPopupMenu(int button, int action, int mode)
 {
 	if (PopupMenu && PopupMenu->Items->Count > -1 && button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS) {
 		POINT pt;
@@ -505,8 +434,8 @@ void TWindowContainer::showPopupMenu(int button, int action, int mode)
 	}
 }
 
-void TWindowContainer::getPos(){
-	if (type == WindowType::SEIS || type == WindowType::RGB) {
+void TSectionWindowContainer::getPos(){
+	if (type == SectionWindowType::SEIS || type == SectionWindowType::RGB) {
 	IFlatWindow* flatWin = dynamic_cast<IFlatWindow*>(window.get());
 		double posx, posy;
 		glfwGetCursorPos(window->getWindow(), &posx, &posy);
@@ -536,14 +465,14 @@ void TWindowContainer::getPos(){
 }
 
 
-void TWindowContainer::scheduleDisplay(double x, double y) {
+void TSectionWindowContainer::scheduleDisplay(double x, double y) {
     if (!callbackDisp) return;
     pendingMouseX = x;
     pendingMouseY = y;
     displayTimer->Enabled = false;
     displayTimer->Enabled = true;
 }
-void __fastcall TWindowContainer::ApplyDisplayCallback(TObject*) {
+void __fastcall TSectionWindowContainer::ApplyDisplayCallback(TObject*) {
     displayTimer->Enabled = false;
     if (!callbackDisp) return;
     auto* flat = dynamic_cast<FlatWindow*>(window.get());
@@ -587,63 +516,36 @@ void __fastcall TWindowContainer::ApplyDisplayCallback(TObject*) {
     callbackDisp(x, static_cast<int>(y*dT), info);
 }
 
-void TWindowContainer::setupCallbacks()
+void TSectionWindowContainer::setupCallbacks()
 {
-	ICallbackWindow* winCall = dynamic_cast<ICallbackWindow*>(window.get());
-	if (winCall != nullptr) {
-		switch (type) {
-		case WindowType::SEIS:
-			winCall->setMouseButtonCallback(showPopupMenu);
-			winCall->setScrollCallback([this](double ox, double oy){
-			if (syncButton->Checked) {
-					TWindowContainer::emitToAll();
-					return;
-				}
-				updateAxis(true);});
-			winCall->setCursorPosCallback([this](double ox, double oy){
-                scheduleDisplay(ox, oy);
-			if (syncButton->Checked) {
-					TWindowContainer::emitToAll();
-					return;
-				}
-				updateAxis(false);
-                getPos();
-                callback(posx_);
-                });
-		break;
-		case WindowType::RGB:
-			winCall->setMouseButtonCallback(showPopupMenu);
-			winCall->setScrollCallback([this](double ox, double oy){
-			if (syncButton->Checked) {
-					emitToAll();
-					return;
-				}
-				updateAxis(true);});
-			winCall->setCursorPosCallback([this](double ox, double oy){
-                scheduleDisplay(ox, oy);
-			if (syncButton->Checked) {
-					emitToAll();
-					return;
-				}
-				updateAxis(false);
-                getPos();
-                callback(posx_);
-                });
-		break;
-		case WindowType::VOL:
-			winCall->setMouseButtonCallback(showPopupMenu);
-		break;
-		default:
-		throw;
-		}
-        if (type == WindowType::SEIS || type == WindowType::RGB)
-            winCall->setCursorEnterCallback([this](int entered) {
-                if (!entered) displayTimer->Enabled = false;
-            });
-	}
+    auto* callbacks = dynamic_cast<ICallbackWindow*>(window.get());
+    if (!callbacks) return;
+    callbacks->setMouseButtonCallback([this](int button, int action, int mode) {
+        showPopupMenu(button, action, mode);
+    });
+    callbacks->setScrollCallback([this](double, double) {
+        if (syncButton->Checked) {
+            emitToAll();
+            return;
+        }
+        updateAxis(true);
+    });
+    callbacks->setCursorPosCallback([this](double x, double y) {
+        scheduleDisplay(x, y);
+        if (syncButton->Checked) {
+            emitToAll();
+            return;
+        }
+        updateAxis(false);
+        getPos();
+        callback(posx_);
+    });
+    callbacks->setCursorEnterCallback([this](int entered) {
+        if (!entered) displayTimer->Enabled = false;
+    });
 }
 
-void TWindowContainer::createWindow(const std::shared_ptr<IBaseData>& newData,
+void TSectionWindowContainer::createWindow(const std::shared_ptr<IBaseData>& newData,
     OverlayMapping mapping, int sourceTrace)
 {
     if (!newData) return;
@@ -663,7 +565,7 @@ void TWindowContainer::createWindow(const std::shared_ptr<IBaseData>& newData,
         overlays = transferOverlays(source->getHorizons(), source->getCrosses(),
             sourceWidth, targetWidth, mapping, sourceTrace);
 
-    std::unique_ptr<TFormUniversal> form(new TFormUniversal(Application->MainForm, basePath));
+    std::unique_ptr<TFormSection2D> form(new TFormSection2D(Application->MainForm, basePath));
     if (mapping == OverlayMapping::SameGrid)
         form->setTraceCallback(callback);
     else
@@ -685,7 +587,7 @@ void TWindowContainer::createWindow(const std::shared_ptr<IBaseData>& newData,
     form.release();
 }
 
-void TWindowContainer::setupFlatButtons(){
+void TSectionWindowContainer::setupFlatButtons(){
     addButton("Edit horizon (draw with mouse)", [this]() {
         auto* flat = dynamic_cast<FlatWindow*>(window.get());
         if (!flat) return;
@@ -785,7 +687,7 @@ createWindow(newData, OverlayMapping::Trace, posx_);
 	});
 }
 
-void TWindowContainer::setupSeisButtons(){
+void TSectionWindowContainer::setupSeisButtons(){
 auto sData = std::dynamic_pointer_cast<SeismicData>(dataContainer);
 auto type = sData ->getType();
 if (!(type == DataType::EN_BASE || type == DataType::EN_BASE
@@ -869,7 +771,7 @@ createWindow(newData);
 	});
  }
 }
-void TWindowContainer::setupRgbButtons(){
+void TSectionWindowContainer::setupRgbButtons(){
 addButton("Cluster", [&](){
 		{
         TAbstractDialog* dialog = new TAbstractDialog(nullptr);
@@ -902,238 +804,18 @@ addButton("Cluster", [&](){
 	});
 }
 
-void TWindowContainer::setupVolumButtons(){
-//GLuint SEISMIC_SHADER = createShaderProgram("volumetric", "seismic");
-//GLuint RGB_SHADER = createShaderProgram("volumetric", "rgb");
-	addButton("Add slice", [&](){
-		int num = 0;
-		TAbstractDialog* dialog = new TAbstractDialog(nullptr);
-		dialog->AddInput<int>("Номер", num);
-        if (dialog->Execute() && dialog->ContinuePressed) {
-            bool success = false;
-            glm::vec3 norm = glm::vec3(0.0f, 0.0f, 1.0f);
-            glm::vec3 pos;
-            glm::vec2 _sz = glm::vec2(1.0f, 1.0f);
-            if (ExtractFileExt(fileName.c_str()) == L".ibm") {
-                size sz = readSize(fileName);
-                std::shared_ptr<SeismicData> seismicData;
-				bool flipV = false, flipH = false;
-                flipV=true;
-				Traces tr = readTimeSliceRegular(ChangeFileExt(fileName.c_str(), L".sbm").c_str(), num);
-				seismicData = std::make_shared<SeismicData>(tr.data, tr.dt, tr.samplesNumber, tr.tracesNumber);
-
-                norm = glm::vec3(0.0f, 1.0f, 0.0f);
-                pos = glm::vec3(0.0f, (float)sz.samples/2-num, 0.0f);
-                _sz = glm::vec2((float)sz.lines, (float)sz.traces);
-                if (!seismicData->getCM()) {
-                    seismicData->setCM(colorManager);
-                }
-                auto seismicPlane = std::make_shared<SeismicPlane>(
-					pos,  // позиция
-					norm,   // нормаль (смотрит вперед)
-					_sz,         // размер
-					createShaderProgram("volumetric", "seismic"),
-					[fName = fileName, num](){Traces tr = readTimeSliceRegular(ChangeFileExt(fName.c_str(), L".sbm").c_str(), num);return std::make_shared<SeismicData>(tr.data, tr.dt, tr.samplesNumber, tr.tracesNumber);},
-					flipV,
-					flipH
-				);
-				seismicPlane->updateTexture(seismicData->getTexture());
-				seismicPlane->initPaletteTexture(PALETTE);
-				(dynamic_cast<IVolumeWindow*>(window.get()))->addPlane(seismicPlane);
-            }
-            else {
-            	std::vector<float> frequens;
-                size4 sz = readSizeRGB(fileName, frequens);
-                std::shared_ptr<RgbData> rgbData;
-				bool flipV = false, flipH = false;
-                flipV = true;
-				rgbData = readTimeSliceRGB(ChangeFileExt(fileName.c_str(), L".srgb").c_str(), num);
-                norm = glm::vec3(0.0f, 1.0f, 0.0f);
-                pos = glm::vec3(0.0f, (float)sz.samples/2-num, 0.0f);
-                _sz = glm::vec2((float)sz.lines, (float)sz.traces);
-                if (!rgbData->getCM()) {
-                    rgbData->setCM(colorManager);
-                }
-                auto rgbPlane = std::make_shared<RgbPlane>(
-					pos,  // позиция
-					norm,   // нормаль (смотрит вперед)
-					_sz,         // размер
-					createShaderProgram("volumetric", "rgb"),
-					[fName = fileName, num](){return readTimeSliceRGB(ChangeFileExt(fName.c_str(), L".srgb").c_str(), num);},
-					flipV,
-                    flipH
-				);
-				rgbPlane->initTextureArray(rgbData->getTexture());
-				(dynamic_cast<IVolumeWindow*>(window.get()))->addPlane(rgbPlane);
-            }
-        }
-	});
-    addButton("Add inline", [&](){
-		int num = 0;
-		TAbstractDialog* dialog = new TAbstractDialog(nullptr);
-		dialog->AddInput<int>("Номер", num);
-        if (dialog->Execute() && dialog->ContinuePressed) {
-            bool success = false;
-            glm::vec3 norm = glm::vec3(0.0f, 0.0f, 1.0f);
-            glm::vec3 pos;
-            glm::vec2 _sz = glm::vec2(1.0f, 1.0f);
-            if (ExtractFileExt(fileName.c_str()) == L".ibm") {
-                size sz = readSize(fileName);
-                std::shared_ptr<SeismicData> seismicData;
-				bool flipV = false, flipH = false;
-				Traces tr = readInlineRegular(fileName, num);
-				seismicData = std::make_shared<SeismicData>(tr.data, tr.dt, tr.samplesNumber, tr.tracesNumber);
-
-					pos = glm::vec3(0.0f, 0.0f, (float)sz.lines/2-num);
-					_sz = glm::vec2((float)sz.traces, (float)sz.samples);
-					flipV=true;
-                if (!seismicData->getCM()) {
-                    seismicData->setCM(colorManager);
-                }
-                auto seismicPlane = std::make_shared<SeismicPlane>(
-					pos,  // позиция
-					norm,   // нормаль (смотрит вперед)
-					_sz,         // размер
-					createShaderProgram("volumetric", "seismic"),
-					[fName = fileName, num](){Traces tr = readInlineRegular(fName, num);return std::make_shared<SeismicData>(tr.data, tr.dt, tr.samplesNumber, tr.tracesNumber);},
-					flipV,
-                    flipH
-				);
-				seismicPlane->updateTexture(seismicData->getTexture());
-				seismicPlane->initPaletteTexture(PALETTE);
-				(dynamic_cast<IVolumeWindow*>(window.get()))->addPlane(seismicPlane);
-            }
-            else {
-            	std::vector<float> frequens;
-                size4 sz = readSizeRGB(fileName, frequens);
-                std::shared_ptr<RgbData> rgbData;
-				bool flipV = false, flipH = false;
-				rgbData = readInlineRGB(fileName, num);
-                pos = glm::vec3(0.0f, 0.0f, (float)sz.lines/2-num);
-                _sz = glm::vec2((float)sz.traces, (float)sz.samples);
-                flipV=true;
-                if (!rgbData->getCM()) {
-                    rgbData->setCM(colorManager);
-                }
-                auto rgbPlane = std::make_shared<RgbPlane>(
-					pos,  // позиция
-					norm,   // нормаль (смотрит вперед)
-					_sz,         // размер
-					createShaderProgram("volumetric", "rgb"),
-					[fName = fileName, num](){return readInlineRGB(fName, num);},
-					flipV,
-                    flipH
-				);
-				rgbPlane->initTextureArray(rgbData->getTexture());
-				(dynamic_cast<IVolumeWindow*>(window.get()))->addPlane(rgbPlane);
-            }
-        }
-	});
-    addButton("Add crossline", [&](){
-		int num = 0;
-		TAbstractDialog* dialog = new TAbstractDialog(nullptr);
-		dialog->AddInput<int>("Номер", num);
-        if (dialog->Execute() && dialog->ContinuePressed) {
-            bool success = false;
-            glm::vec3 norm = glm::vec3(0.0f, 0.0f, 1.0f);
-            glm::vec3 pos;
-            glm::vec2 _sz = glm::vec2(1.0f, 1.0f);
-            if (ExtractFileExt(fileName.c_str()) == L".ibm") {
-                size sz = readSize(fileName);
-                std::shared_ptr<SeismicData> seismicData;
-				bool flipV = false, flipH = false;
-				Traces tr = readXlineRegular(fileName, num);
-                //Traces tr = readInlineRegular(ChangeFileExt(fileName.c_str(), L".xbm").c_str(), num);
-				seismicData = std::make_shared<SeismicData>(tr.data, tr.dt, tr.samplesNumber, tr.tracesNumber);
-
-					norm = glm::vec3(1.0f, 0.0f, 0.0f);
-					pos = glm::vec3((float)sz.traces/2-num, 0.0f, 0.0f);
-					_sz = glm::vec2((float)sz.lines, (float)sz.samples);
-					flipV=true;
-                    flipH=true;
-                if (!seismicData->getCM()) {
-                    seismicData->setCM(colorManager);
-                }
-				auto seismicPlane = std::make_shared<SeismicPlane>(
-					pos,  // позиция
-					norm,   // нормаль (смотрит вперед)
-					_sz,         // размер
-					createShaderProgram("volumetric", "seismic"),
-					[fName = fileName, num](){Traces tr = readXlineRegular(fName, num);return std::make_shared<SeismicData>(tr.data, tr.dt, tr.samplesNumber, tr.tracesNumber);},
-					flipV,
-					flipH
-				);
-				seismicPlane->updateTexture(seismicData->getTexture());
-				seismicPlane->initPaletteTexture(PALETTE);
-				(dynamic_cast<IVolumeWindow*>(window.get()))->addPlane(seismicPlane);
-            }
-            else {
-            	std::vector<float> frequens;
-                size4 sz = readSizeRGB(fileName, frequens);
-                std::shared_ptr<RgbData> rgbData;
-				bool flipV = false, flipH = false;
-				rgbData = readCrosslineRGB(fileName, num);
-                norm = glm::vec3(1.0f, 0.0f, 0.0f);
-                pos = glm::vec3((float)sz.traces/2-num, 0.0f, 0.0f);
-				_sz = glm::vec2((float)sz.lines, (float)sz.samples);
-				flipV=true;
-				flipH=true;
-                if (!rgbData->getCM()) {
-                    rgbData->setCM(colorManager);
-                }
-                auto rgbPlane = std::make_shared<RgbPlane>(
-					pos,  // позиция
-					norm,   // нормаль (смотрит вперед)
-					_sz,         // размер
-					createShaderProgram("volumetric", "rgb"),
-					[fName = fileName, num](){return readCrosslineRGB(fName, num);},
-					flipV,
-                    flipH
-				);
-				rgbPlane->initTextureArray(rgbData->getTexture());
-				(dynamic_cast<IVolumeWindow*>(window.get()))->addPlane(rgbPlane);
-            }
-        }
-	});
-    addButton("Delete panel", [&](){
-        IVolumeWindow* viewport = dynamic_cast<IVolumeWindow*>(window.get());
-    	viewport->removePlane(viewport->getSelectedPlane());
-		window->renderWindow();
-	});
-	addButton("Show panel", [&](){
-		IVolumeWindow* viewport = dynamic_cast<IVolumeWindow*>(window.get());
-		auto sel = viewport->getSelectedPlane();
-		std::shared_ptr<IBaseData> newData = sel->getData();
-		createWindow(newData);
-	});
-    addButton("Set Transparency", [&](){
-        float num = 0;
-        TAbstractDialog* dialog = new TAbstractDialog(nullptr);
-        dialog->AddInput<float>("Прозрачность", num);
-        if (dialog->Execute() && dialog->ContinuePressed) {
-        	IVolumeWindow* viewport = dynamic_cast<IVolumeWindow*>(window.get());
-            viewport->getSelectedPlane()->setTransparency(num/100.0f);
-            window->renderWindow();
-        }
-        delete dialog;
-    });
-}
-
-void TWindowContainer::setupButtons()
+void TSectionWindowContainer::setupButtons()
 {
 	ICallbackWindow* winCall = dynamic_cast<ICallbackWindow*>(window.get());
 	if (winCall != nullptr) {
 		switch (type) {
-		case WindowType::SEIS:
+		case SectionWindowType::SEIS:
 		setupFlatButtons();
         setupSeisButtons();
 		break;
-		case WindowType::RGB:
+		case SectionWindowType::RGB:
 		setupFlatButtons();
         setupRgbButtons();
-		break;
-		case WindowType::VOL:
-        setupVolumButtons();
 		break;
 		default:
 		throw;
@@ -1143,7 +825,7 @@ void TWindowContainer::setupButtons()
 }
 
 
-void TWindowContainer::updateAxis(bool reEval){
+void TSectionWindowContainer::updateAxis(bool reEval){
 	IFlatWindow* winFlat = dynamic_cast<IFlatWindow*>(window.get());
 	if (winFlat) {
 		float zoom = winFlat->getZoom();
@@ -1190,7 +872,7 @@ void TWindowContainer::updateAxis(bool reEval){
 	}
 }
 
-void TWindowContainer::LoadHorizon(const std::wstring& filename, const std::wstring& fileext){
+void TSectionWindowContainer::LoadHorizon(const std::wstring& filename, const std::wstring& fileext){
 	IFlatWindow* winFlat = dynamic_cast<IFlatWindow*>(window.get());
 
 	if (!winFlat) {
@@ -1224,7 +906,7 @@ void TWindowContainer::LoadHorizon(const std::wstring& filename, const std::wstr
 	window->renderWindow();
 }
 
-void TWindowContainer::SaveHorizon(const std::wstring& filename, const std::wstring& fileext){
+void TSectionWindowContainer::SaveHorizon(const std::wstring& filename, const std::wstring& fileext){
 	IFlatWindow* winFlat = dynamic_cast<IFlatWindow*>(window.get());
 
 	if (!winFlat) {
@@ -1254,7 +936,7 @@ void TWindowContainer::SaveHorizon(const std::wstring& filename, const std::wstr
 	}
 }
 
-void TWindowContainer::saveFile(std::wstring path){
+void TSectionWindowContainer::saveFile(std::wstring path){
 auto sData = std::dynamic_pointer_cast<SeismicData>(dataContainer);
 auto rData = std::dynamic_pointer_cast<RgbData>(dataContainer);
 if (sData) {
@@ -1265,27 +947,17 @@ if (rData) {
 }
 }
 
-void TWindowContainer::checkAxis(bool left, bool top, bool right){
+void TSectionWindowContainer::checkAxis(bool left, bool top, bool right){
 	image1->Visible = left;
     image2->Visible = top;
     image3->Visible = right;
     Resize(this);
 }
 
-void TWindowContainer::saveVolScreenshot(System::UnicodeString path){
-	IVolumeWindow* winFlat = dynamic_cast<IVolumeWindow*>(window.get());
-	if (!winFlat) {
-		return;
-	}
-
-}
-
-void TWindowContainer::saveScreenshot(System::UnicodeString path){
+void TSectionWindowContainer::saveScreenshot(System::UnicodeString path){
     if (rgbChangeTimer && rgbChangeTimer->Enabled) ApplyRgbChannels(nullptr);
 	IFlatWindow* winFlat = dynamic_cast<IFlatWindow*>(window.get());
-	if (!winFlat) {
-		return saveVolScreenshot(path);
-	}
+	if (!winFlat) return;
 
     std::unique_ptr<Graphics::TBitmap> result(winFlat->getScreenshotAsBitmap());
     if (!result) return;

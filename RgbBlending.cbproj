@@ -264,11 +264,11 @@
             <DependentOn>UnitFormVolume.h</DependentOn>
             <BuildOrder>31</BuildOrder>
         </CppCompile>
-        <CppCompile Include="UnitFormUniversal.cpp">
+        <CppCompile Include="UnitFormSection2D.cpp">
             <VirtualFolder>{F35ACD7E-016A-4E8E-8A21-05004CE80EF2}</VirtualFolder>
-            <Form>FormUniversal</Form>
+            <Form>FormSection2D</Form>
             <FormType>dfm</FormType>
-            <DependentOn>UnitFormUniversal.h</DependentOn>
+            <DependentOn>UnitFormSection2D.h</DependentOn>
             <BuildOrder>25</BuildOrder>
         </CppCompile>
         <CppCompile Include="UnitLoading.cpp">
@@ -277,13 +277,6 @@
             <FormType>dfm</FormType>
             <DependentOn>UnitLoading.h</DependentOn>
             <BuildOrder>26</BuildOrder>
-        </CppCompile>
-        <CppCompile Include="UnitSeismic3d.cpp">
-            <VirtualFolder>{F35ACD7E-016A-4E8E-8A21-05004CE80EF2}</VirtualFolder>
-            <Form>Seismic3d</Form>
-            <FormType>dfm</FormType>
-            <DependentOn>UnitSeismic3d.h</DependentOn>
-            <BuildOrder>27</BuildOrder>
         </CppCompile>
         <CppCompile Include="UnitSimpleDialog.cpp">
             <VirtualFolder>{F35ACD7E-016A-4E8E-8A21-05004CE80EF2}</VirtualFolder>
@@ -304,9 +297,14 @@
             <DependentOn>ViewportWindow.h</DependentOn>
             <BuildOrder>29</BuildOrder>
         </CppCompile>
-        <CppCompile Include="WindowContainer.cpp">
+        <CppCompile Include="VolumeWindowContainer.cpp">
             <VirtualFolder>{27FDC0BA-129F-4ADE-9F5F-3DBA97EFA389}</VirtualFolder>
-            <DependentOn>WindowContainer.h</DependentOn>
+            <DependentOn>VolumeWindowContainer.h</DependentOn>
+            <BuildOrder>32</BuildOrder>
+        </CppCompile>
+        <CppCompile Include="SectionWindowContainer.cpp">
+            <VirtualFolder>{27FDC0BA-129F-4ADE-9F5F-3DBA97EFA389}</VirtualFolder>
+            <DependentOn>SectionWindowContainer.h</DependentOn>
             <BuildOrder>30</BuildOrder>
         </CppCompile>
         <LibFiles Include="__libs\bin\glew.a" Condition="'$(Platform)'=='Win64' Or '$(Platform)'=='Win64x'">
@@ -318,9 +316,8 @@
             <IgnorePath>true</IgnorePath>
         </LibFiles>
         <FormResources Include="UnitFormVolume.dfm"/>
-        <FormResources Include="UnitFormUniversal.dfm"/>
+        <FormResources Include="UnitFormSection2D.dfm"/>
         <FormResources Include="UnitLoading.dfm"/>
-        <FormResources Include="UnitSeismic3d.dfm"/>
         <FormResources Include="UnitSimpleDialog.dfm"/>
         <FormResources Include="UnitStatistics.dfm"/>
         <FormResources Include="Dialog.dfm"/>

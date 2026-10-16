@@ -39,7 +39,7 @@ __fastcall TFormVolume::TFormVolume(TComponent* Owner, System::UnicodeString bas
         frequencies[i]->SetBounds(295, 9 + i * 28, 100, 20);
     }
 
-    container = new TWindowContainer(this);
+    container = new TVolumeWindowContainer(this);
     container->setBasePath(basePath);
     container->Parent = this;
     container->Align = alClient;

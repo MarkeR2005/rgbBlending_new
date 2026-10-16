@@ -17,7 +17,6 @@
 //----------------------------------------------------------------
 
 extern "C" void init();
-//extern "C" void EXPORT setMoveCallback(TFormUniversal* form, void (*callback)(int));
 extern "C" TForm* __cdecl EXPORT CreateRgbBlendingForm(System::UnicodeString path, std::function<void(int)> callback, std::function<void(int, int, std::string)> callbackDisplay);
 extern "C" TForm* __cdecl EXPORT CreateRgbBlendingFormCube(System::UnicodeString path);
 // Public STL types; no definitions from Structures.h are needed by the host.
@@ -32,7 +31,7 @@ typedef std::vector<std::pair<std::wstring, int>> RgbCrosses;
 // A null callback removes the registration.
 typedef void (__cdecl *RgbHorizonsCallback)(const RgbHorizons& horizons, void* context);
 
-// The form must be a live TFormUniversal returned by CreateRgbBlendingForm.
+// The form must be a live 2D form returned by CreateRgbBlendingForm.
 // An empty vector clears the list.
 extern "C" bool __cdecl EXPORT setTraceCallback(TForm* f, std::function<void(int)> callback);
 extern "C" bool __cdecl EXPORT setDisplayCallback(TForm* f, std::function<void(int, int, std::string)> callback);

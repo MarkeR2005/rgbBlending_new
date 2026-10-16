@@ -10,26 +10,26 @@
 #include "DataCalculator.h"
 #include "RgbData.h"
 #include "Structures.h"
-#include "UnitFormUniversal.h"
+#include "UnitFormSection2D.h"
 #include "UnitFormVolume.h"
 #include <memory>
 #include "ChooseForm.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 bool __cdecl setTraceCallback(TForm* f, std::function<void(int)> cb) {
-    auto* form = dynamic_cast<TFormUniversal*>(f);
+    auto* form = dynamic_cast<TFormSection2D*>(f);
     if (!form || !form->windowContainer) return false;
     form->setTraceCallback(std::move(cb));
     return true;
 }
 bool __cdecl setDisplayCallback(TForm* f, std::function<void(int, int, std::string)> cb) {
-    auto* form = dynamic_cast<TFormUniversal*>(f);
+    auto* form = dynamic_cast<TFormSection2D*>(f);
     if (!form || !form->windowContainer) return false;
     form->setDisplayCallback(std::move(cb));
     return true;
 }
 bool __cdecl setHorizonsCallback(TForm* f, RgbHorizonsCallback callback, void* context) {
-    auto* form = dynamic_cast<TFormUniversal*>(f);
+    auto* form = dynamic_cast<TFormSection2D*>(f);
     if (!form || !form->windowContainer) return false;
     if (!callback) {
         return form->setHorizonsCallback({});
@@ -44,7 +44,7 @@ bool __cdecl setHorizonsCallback(TForm* f, RgbHorizonsCallback callback, void* c
     });
 }
 bool __cdecl setHorizons(TForm* f, const RgbHorizons& input, const RgbHorizonColors& colors) {
-    auto* form = dynamic_cast<TFormUniversal*>(f);
+    auto* form = dynamic_cast<TFormSection2D*>(f);
     if (!form || !form->windowContainer) return false;
     std::vector<Horizon> converted;
     converted.reserve(input.size());
@@ -65,7 +65,7 @@ bool __cdecl setHorizons(TForm* f, const RgbHorizons& input, const RgbHorizonCol
     return form->setHorizons(converted);
 }
 bool __cdecl setCrosses(TForm* f, const RgbCrosses& input) {
-    auto* form = dynamic_cast<TFormUniversal*>(f);
+    auto* form = dynamic_cast<TFormSection2D*>(f);
     if (!form || !form->windowContainer) return false;
     std::vector<Cross> converted;
     converted.reserve(input.size());
@@ -126,7 +126,7 @@ TForm* __cdecl CreateRgbBlendingForm(System::UnicodeString path, std::function<v
 		std::unique_ptr<TChoose> choose(new TChoose(Application->MainForm));
 		choose->SetRGBPath(path);
         if (choose->Execute() && choose->execType!=0){
-            std::unique_ptr<TFormUniversal> form(new TFormUniversal(Application->MainForm, path));
+            std::unique_ptr<TFormSection2D> form(new TFormSection2D(Application->MainForm, path));
 			setTraceCallback(form.get(), callback);
             setDisplayCallback(form.get(), callbackDisplay);
             switch (choose->execType) {

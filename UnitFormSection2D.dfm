@@ -1,7 +1,7 @@
-object FormUniversal: TFormUniversal
+object FormSection2D: TFormSection2D
   Left = 0
   Top = 0
-  Caption = 'FormUniversal'
+  Caption = 'FormSection2D'
   ClientHeight = 423
   ClientWidth = 582
   Color = clBtnFace

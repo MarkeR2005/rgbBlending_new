@@ -4,11 +4,15 @@ Windows VCL/OpenGL module for seismic and RGB views. The existing cube/3D render
 
 ## Window layout
 
-`CreateRgbBlendingForm` opens a 2D section (`TFormUniversal`), while
-`CreateRgbBlendingFormCube` opens a separate volume form (`TFormVolume`).
-The volume form has its own RGB channel controls; 2D horizon, cross and axis
-controls belong to the section form. Opening a selected plane in the volume
-creates a 2D section. Cancelling either selection dialog returns `nullptr`.
+`CreateRgbBlendingForm` opens `TFormSection2D` with a
+`TSectionWindowContainer`. `CreateRgbBlendingFormCube` opens `TFormVolume`
+with a separate `TVolumeWindowContainer`. The volume container owns the 3D
+viewport and plane actions; its form owns the RGB channel controls. The section container owns
+2D horizons, crosses, axes, processing and full-section screenshots. Opening
+a selected plane in the volume creates a 2D section. Cancelling either
+selection dialog returns `nullptr`. The DLL exports and `GetProcAddress`
+signatures remain the same; old internal form/container headers forward to
+the 2D types for source compatibility.
 
 All derived 2D windows copy horizon names, colors, contrast settings and
 gaps, along with applicable crosses and callbacks. Smoothing, filters,
