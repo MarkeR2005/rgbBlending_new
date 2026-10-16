@@ -92,6 +92,7 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	void setCursorEnterCallback(std::function<void(int)> callback) override;
 		//--
 	protected:
+    bool blackCrosses = false;
 	bool isSync = false;
     bool isDrawing = false;
 	bool firstPoint = true;
@@ -123,7 +124,6 @@ class FlatWindow : public IWindow, public ICallbackWindow, public IFlatWindow, p
 	private:
 	size_t horNum = 0;
     bool showHorizons = true, showCrosses = true;
-    bool blackCrosses = false;
     std::vector<Horizon> horizons;
     std::vector<Cross> crosses;
     struct TextLabel { GLuint texture; int width; int height; };

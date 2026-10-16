@@ -1327,7 +1327,7 @@ void TWindowContainer::saveScreenshot(System::UnicodeString path){
 
     fin->Canvas->FillRect(Rect(0, 0, result->Width, 50));
     fin->Canvas->Draw((image1->Visible ? 50 : 0) ,0, axis->getBitmap());
-    fin->Canvas->Draw(50,50, result);
+    fin->Canvas->Draw(50,50, result.get());
     fin->Canvas->Draw(result->Width+50, (image1->Visible ? 50 : 0), axisYR->getBitmap());
     updateAxis(true);
 System::UnicodeString timestamp = FormatDateTime(L"yyyymmdd_hhnnss", TDateTime::CurrentDateTime());
